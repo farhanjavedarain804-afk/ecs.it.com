@@ -2,10 +2,11 @@ const mysql = require('mysql2/promise');
 require('dotenv').config();
 
 const pool = mysql.createPool({
-    host: '127.0.0.1', // HARDCODED: force IPv4 localhost to bypass ETIMEDOUT and IPv6 bugs
-    user: process.env.DB_USER || 'devionic_ecsuser', // Fallback if .env is missing
-    password: process.env.DB_PASS || 'Furhan112233344555Javed', // Fallback if .env is missing
-    database: process.env.DB_NAME || 'devionic_ecs', // Fallback if .env is missing
+    host: process.env.DB_HOST || '127.0.0.1',
+    user: process.env.DB_USER || 'u168718068_ecsuser',
+    password: process.env.DB_PASS || 'Furhan1122334455Javed',
+    database: process.env.DB_NAME || 'u168718068_ecs',
+    port: parseInt(process.env.DB_PORT, 10) || 3306,
     waitForConnections: true,
     connectionLimit: 10,
     queueLimit: 0,
@@ -25,26 +26,22 @@ pool.on('connection', (connection) => {
 });
 
 // Immediate connection test with improved diagnostics
-// Immediate connection test commented out to prevent startup crashes when offline/not whitelisted
-/*
 (async () => {
     try {
         const connection = await pool.getConnection();
-        console.log('✅ Remote Database Connected Successfully');
+        console.log('✅ Database Connected Successfully');
         connection.release();
     } catch (err) {
         if (err.code === 'ER_ACCESS_DENIED_ERROR') {
             console.error('\n❌ DATABASE ACCESS DENIED');
-            console.error('Check if your IP is whitelisted on the remote server (159.195.26.89).');
             console.error('Verify DB_USER/DB_PASS in your .env file.\n');
         } else if (err.code === 'ETIMEDOUT') {
             console.error('\n❌ DATABASE CONNECTION TIMEOUT');
-            console.error('The remote server is too slow or unreachable. Check your internet or whitelist.\n');
+            console.error('The database server is unreachable. Check your network.\n');
         } else {
             console.error('❌ Database Connection Error:', err.message);
         }
     }
 })();
-*/
 
 module.exports = pool;

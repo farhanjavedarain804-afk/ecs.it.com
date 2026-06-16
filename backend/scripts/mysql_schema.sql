@@ -1,6 +1,6 @@
 -- Consolidated MySQL Schema for ECS
 -- Converted from Supabase PostgreSQL Migrations
--- Ensure you have created the database 'devionic_ecs' first.
+-- Ensure you have created the database 'u168718068_ecs' first.
 
 SET FOREIGN_KEY_CHECKS = 0;
 

@@ -83,11 +83,27 @@ app.use('/api/analytics', require('./routes/analytics'));
 app.use('/api/payments', require('./routes/payments'));
 app.use('/api/public', require('./routes/public'));
 
-// 404 Handler (Returns JSON instead of HTML)
+// Serve Frontend (Production) - Serves built Vite files from ../dist
+const distPath = path.join(__dirname, '..', 'dist');
+if (fs.existsSync(distPath)) {
+    app.use(express.static(distPath));
+    console.log(`[Static] Serving frontend from: ${distPath}`);
+}
+
+// 404 Handler - For API routes return JSON, for everything else serve frontend
 app.use((req, res) => {
-    console.log(`[404] ${req.method} ${req.originalUrl}`);
-    fs.appendFileSync(path.join(__dirname, 'debug_requests.log'), `[404] ${req.method} ${req.url}\n`);
-    res.status(404).json({ error: `Route not found: ${req.method} ${req.originalUrl}` });
+    // If it's an API request, return JSON error
+    if (req.originalUrl.startsWith('/api/') || req.originalUrl === '/health') {
+        console.log(`[404] ${req.method} ${req.originalUrl}`);
+        fs.appendFileSync(path.join(__dirname, 'debug_requests.log'), `[404] ${req.method} ${req.url}\n`);
+        return res.status(404).json({ error: `Route not found: ${req.method} ${req.originalUrl}` });
+    }
+    // For all other routes, serve the frontend (SPA fallback)
+    const indexPath = path.join(distPath, 'index.html');
+    if (fs.existsSync(indexPath)) {
+        return res.sendFile(indexPath);
+    }
+    res.status(404).json({ error: 'Frontend not built. Run npm run build first.' });
 });
 
 // Error Handling Middleware (Returns JSON instead of HTML)
