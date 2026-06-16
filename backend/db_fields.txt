@@ -1,0 +1,5 @@
+﻿[dotenv@17.3.1] injecting env (9) from .env -- tip: ΓÜí∩╕Å secrets for agents: https://dotenvx.com/as2
+Γ£à Database Connected Successfully
+COMPLAINT_FIELDS: id,complaint_number,verification_id,customer_id,branch_id,assigned_to,assigned_helper,complaint_type,priority,status,description,location_lat,location_lng,warranty_type,resolution_time,notes,attachments,photo_urls,receipt_generated,resolved_at,created_at,updated_at
+INVOICE_FIELDS: id,invoice_number,verification_id,complaint_id,customer_id,branch_id,technician_id,subtotal,tax_amount,discount_amount,total_amount,payment_status,due_date,issued_at,paid_at,items,sales_tax_rate,shipping_handling,advance_paid,notes,created_at,updated_at
+CUSTOMER_FIELDS: id,customer_id,name,phone,email,address,area,city,branch_id,welcome_note_generated,created_at,updated_at

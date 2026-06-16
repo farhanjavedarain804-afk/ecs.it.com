@@ -1,0 +1,1 @@
+Disk got full writing 'information_schema.(temporary)' (Errcode: 28 "No space left on device")

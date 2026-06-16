@@ -1,0 +1,14 @@
+--- STARTING ATTENDANCE DATA SYNC ---
+Logging in to Supabase as farhanjaved357@gmail.com...
+Supabase login successful.
+Fetching attendance from Supabase...
+Fetched 128 records from Supabase.
+Setting foreign key checks to 0...
+Syncing records to MySQL...
+Error syncing record ff760cf7-c4fe-46f5-b35c-02af9ca24927: Duplicate entry '003317a2-0832-4788-9c51-fa98d6070efc-2026-03-05' for key 'staff_id'
+
+--- ATTENDANCE SYNC SUMMARY ---
+Successfully Synced: 0
+Skipped (Exists):    127
+Errors:              1
+Finalized.
