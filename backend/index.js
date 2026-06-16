@@ -116,7 +116,13 @@ app.use((err, req, res, next) => {
     });
 });
 
-const PORT = process.env.PORT || 5000;
-app.listen(PORT, () => {
-    console.log(`ECS Backend running on port ${PORT}`);
-});
+// Export app for server.js (when used as module)
+// Only start listening when run directly (node backend/index.js)
+if (require.main === module) {
+    const PORT = process.env.PORT || 5000;
+    app.listen(PORT, () => {
+        console.log(`ECS Backend running on port ${PORT}`);
+    });
+}
+
+module.exports = app;
