@@ -49,7 +49,7 @@ const Financial = () => {
   const fetchData = async () => {
     const isBranchAdmin = hasRole("branch_admin") && !hasRole("super_admin");
     const branchId = profile?.branch_id;
-    const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+    const API_URL = import.meta.env.VITE_API_URL ?? '';
     const token = localStorage.getItem("ecs_token");
 
     try {
@@ -93,7 +93,7 @@ const Financial = () => {
       return;
     }
 
-    const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+    const API_URL = import.meta.env.VITE_API_URL ?? '';
     const token = localStorage.getItem("ecs_token");
     
     const payload = {
@@ -190,7 +190,7 @@ const Financial = () => {
       return;
     }
 
-    const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+    const API_URL = import.meta.env.VITE_API_URL ?? '';
     const token = localStorage.getItem("ecs_token");
 
     // Diagnostic immediate deletion

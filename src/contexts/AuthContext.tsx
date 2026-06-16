@@ -1,7 +1,7 @@
 import { createContext, useContext, useEffect, useState, ReactNode } from "react";
 import { useToast } from "@/hooks/use-toast";
 
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+const API_URL = import.meta.env.VITE_API_URL ?? '';
 
 export type AppRole = "super_admin" | "branch_admin" | "manager" | "accountant" | "technician" | "store_manager" | "developer" | "staff";
 

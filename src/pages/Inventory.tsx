@@ -113,7 +113,7 @@ const Inventory = () => {
       setCatalogProducts([]);
       return;
     }
-    const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+    const API_URL = import.meta.env.VITE_API_URL ?? '';
     try {
       // Products search in backend
       const res = await fetch(`${API_URL}/api/products?query=${encodeURIComponent(catalogSearch)}`, {
@@ -143,7 +143,7 @@ const Inventory = () => {
 
   const fetchData = async () => {
     setLoading(true);
-    const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+    const API_URL = import.meta.env.VITE_API_URL ?? '';
     const isBranchAdminOnly = hasRole("branch_admin") && !isAdminOrDev;
     const branchId = profile?.branch_id;
 
@@ -215,7 +215,7 @@ const Inventory = () => {
     };
 
     try {
-      const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+      const API_URL = import.meta.env.VITE_API_URL ?? '';
       const url = editingId 
         ? `${API_URL}/api/inventory_items/${editingId}`
         : `${API_URL}/api/inventory_items`;
@@ -258,7 +258,7 @@ const Inventory = () => {
     if (!window.confirm("Are you sure you want to delete this item? This will also remove all its movement logs.")) return;
     
     try {
-      const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+      const API_URL = import.meta.env.VITE_API_URL ?? '';
       const res = await fetch(`${API_URL}/api/inventory_items/${id}`, {
         method: 'DELETE',
         headers: { 'Authorization': `Bearer ${localStorage.getItem('ecs_token')}` }
@@ -284,7 +284,7 @@ const Inventory = () => {
     }
 
     try {
-      const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+      const API_URL = import.meta.env.VITE_API_URL ?? '';
       const selectedItem = items.find(i => i.id === logForm.item_id);
       if (logForm.entry_type === 'issued' && selectedItem && selectedItem.quantity < parseFloat(logForm.qty)) {
         toast({ title: "Insufficient Stock", description: `Available: ${selectedItem.quantity} ${selectedItem.unit}`, variant: "destructive" });
@@ -344,7 +344,7 @@ const Inventory = () => {
     if (!window.confirm("Are you sure you want to delete this entry? This will reverse the stock change.")) return;
     
     try {
-      const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+      const API_URL = import.meta.env.VITE_API_URL ?? '';
       const res = await fetch(`${API_URL}/api/inventory_logs/${id}`, {
         method: 'DELETE',
         headers: { 'Authorization': `Bearer ${localStorage.getItem('ecs_token')}` }

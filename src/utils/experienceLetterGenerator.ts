@@ -17,7 +17,7 @@ export const generateExperienceLetter = async (data: any) => {
     };
 
     try {
-        const res = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:5000'}/api/company_settings`, {
+        const res = await fetch(`${import.meta.env.VITE_API_URL ?? ''}/api/company_settings`, {
             headers: { "Authorization": `Bearer ${localStorage.getItem("ecs_token")}` }
         });
         if (res.ok) {

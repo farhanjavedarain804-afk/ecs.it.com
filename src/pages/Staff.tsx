@@ -7,7 +7,7 @@ import { logActivity } from "@/utils/logger";
 import { generateAppointmentLetter } from "@/utils/appointmentLetterGenerator";
 import { generateExperienceLetter } from "@/utils/experienceLetterGenerator";
 
-const API_URL = import.meta.env.VITE_API_URL || "http://localhost:5000";
+const API_URL = import.meta.env.VITE_API_URL ?? '';
 
 const Staff = () => {
   const { user, profile, hasRole, isDeveloper } = useAuth();

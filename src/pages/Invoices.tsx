@@ -55,7 +55,7 @@ const Invoices = () => {
       const isBranchAdmin = hasRole("branch_admin") && !hasRole("super_admin");
       const branchId = profile?.branch_id;
 
-      const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+      const API_URL = import.meta.env.VITE_API_URL ?? '';
       const authHeader = { 'Authorization': `Bearer ${session?.access_token}` };
 
       const [invRes, custRes, brRes, compRes, staffRes, servRes, prodRes] = await Promise.all([
@@ -204,7 +204,7 @@ const Invoices = () => {
     toast({ title: "Processing Invoice...", description: "Please wait while we generate your document." });
 
     try {
-      const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+      const API_URL = import.meta.env.VITE_API_URL ?? '';
       const res = await fetch(`${API_URL}/api/invoices`, {
         method: 'POST',
         headers: {
@@ -279,7 +279,7 @@ const Invoices = () => {
     }
 
     try {
-      const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+      const API_URL = import.meta.env.VITE_API_URL ?? '';
       const res = await fetch(`${API_URL}/api/invoices/${id}`, {
         method: 'PATCH',
         headers: {
@@ -326,7 +326,7 @@ const Invoices = () => {
     setInvoices(prev => prev.filter(inv => inv.id !== id));
 
     try {
-      const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+      const API_URL = import.meta.env.VITE_API_URL ?? '';
       const res = await window.fetch(`${API_URL}/api/invoices/${id}`, {
         method: 'DELETE',
         headers: { 'Authorization': `Bearer ${localStorage.getItem('ecs_token')}` }
@@ -358,7 +358,7 @@ const Invoices = () => {
   };
 
   const handleDownloadInvoice = async (inv: any) => {
-    const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+    const API_URL = import.meta.env.VITE_API_URL ?? '';
     toast({ title: "Preparing Invoice PDF...", description: "Fetching invoice details..." });
     try {
       const res = await fetch(`${API_URL}/api/invoices/${inv.id}`, {
@@ -382,7 +382,7 @@ const Invoices = () => {
   };
 
   const openEditItems = async (inv: any) => {
-    const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+    const API_URL = import.meta.env.VITE_API_URL ?? '';
     try {
       const res = await fetch(`${API_URL}/api/invoices/${inv.id}`, {
         headers: { 'Authorization': `Bearer ${localStorage.getItem('ecs_token')}` }
@@ -438,7 +438,7 @@ const Invoices = () => {
     const { subtotal, tax, shipping, discount, advance, total } = calculateEditTotals();
     setSavingItems(true);
     try {
-      const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+      const API_URL = import.meta.env.VITE_API_URL ?? '';
       const res = await fetch(`${API_URL}/api/invoices/${editingItemsInvoice.id}/items`, {
         method: 'PUT',
         headers: { 'Authorization': `Bearer ${localStorage.getItem('ecs_token')}`, 'Content-Type': 'application/json' },

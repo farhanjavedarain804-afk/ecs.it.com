@@ -102,7 +102,7 @@ const Attendance = () => {
 
   const { hasRole, profile, isDeveloper } = useAuth();
   const { toast } = useToast();
-  const API = import.meta.env.VITE_API_URL || "http://localhost:5000";
+  const API = import.meta.env.VITE_API_URL ?? '';
   const token = localStorage.getItem("ecs_token");
   const headers = { "Content-Type": "application/json", Authorization: `Bearer ${token}` };
 

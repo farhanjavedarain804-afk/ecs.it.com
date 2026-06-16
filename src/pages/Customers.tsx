@@ -6,7 +6,7 @@ import { Plus, Search, Edit2, Trash2, Lock, Users, MapPin, Calendar, Building2, 
 import { logActivity } from "@/utils/logger";
 import { exportTableToPDF } from "@/utils/pdfGenerator";
 
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+const API_URL = import.meta.env.VITE_API_URL ?? '';
 
 const Customers = () => {
   const [customers, setCustomers] = useState<any[]>([]);

@@ -65,7 +65,7 @@ const Complaints = () => {
   const [uploading, setUploading] = useState(false);
 
   const uploadFile = async (file: File) => {
-    const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+    const API_URL = import.meta.env.VITE_API_URL ?? '';
     const formData = new FormData();
     formData.append('file', file);
 
@@ -112,7 +112,7 @@ const Complaints = () => {
   const fetchAll = async () => {
     const isBranchAdmin = hasRole("branch_admin") && !hasRole("super_admin");
     const branchId = profile?.branch_id;
-    const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+    const API_URL = import.meta.env.VITE_API_URL ?? '';
 
     setLoading(true);
     try {
@@ -157,7 +157,7 @@ const Complaints = () => {
       }
 
       // 1. Check for existing customer in the same branch with matching phone
-      const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+      const API_URL = import.meta.env.VITE_API_URL ?? '';
       const token = localStorage.getItem('ecs_token');
       const checkRes = await fetch(`${API_URL}/api/customers?search=${newCustomer.phone}&branch_id=${form.branch_id || newCustomer.branch_id}`, {
         headers: { 'Authorization': `Bearer ${token}` }
@@ -173,7 +173,7 @@ const Complaints = () => {
       } else {
         // 2. Create new customer (different name or new phone)
         try {
-          const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+          const API_URL = import.meta.env.VITE_API_URL ?? '';
           const res = await fetch(`${API_URL}/api/customers`, {
             method: 'POST',
             headers: {
@@ -223,7 +223,7 @@ const Complaints = () => {
       attachments: form.attachments.filter(a => a.trim() !== ""),
     };
 
-    const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+    const API_URL = import.meta.env.VITE_API_URL ?? '';
     const headers = {
       'Authorization': `Bearer ${localStorage.getItem('ecs_token')}`,
       'Content-Type': 'application/json'
@@ -274,7 +274,7 @@ const Complaints = () => {
     const existingAtts = Array.isArray(solvingComplaint.attachments) ? solvingComplaint.attachments :
       (typeof solvingComplaint.attachments === 'string' && solvingComplaint.attachments.startsWith('[') ? JSON.parse(solvingComplaint.attachments) : []);
 
-    const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+    const API_URL = import.meta.env.VITE_API_URL ?? '';
     const res = await fetch(`${API_URL}/api/complaints/${solvingComplaint.id}`, {
       method: 'PATCH',
       headers: {
@@ -392,7 +392,7 @@ const Complaints = () => {
 
     // All other status updates go through the backend API (MySQL)
     try {
-      const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+      const API_URL = import.meta.env.VITE_API_URL ?? '';
       const res = await fetch(`${API_URL}/api/complaints/${id}`, {
         method: 'PATCH',
         headers: {
@@ -429,7 +429,7 @@ const Complaints = () => {
       const oldC = complaints.find(c => c.id === id);
 
       // Attempt delete with exact count
-      const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+      const API_URL = import.meta.env.VITE_API_URL ?? '';
       const res = await fetch(`${API_URL}/api/complaints/${id}`, {
         method: 'DELETE',
         headers: { 'Authorization': `Bearer ${localStorage.getItem('ecs_token')}` },
@@ -989,7 +989,7 @@ const Complaints = () => {
                     .filter((att: string) => typeof att === 'string' && att.trim() !== "" && att !== "[" && att !== "]")
                     .map((att: string, i: number) => {
                       const [name, rawUrl] = att.includes('|') ? att.split('|') : [null, att];
-                      const baseUrl = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+                      const baseUrl = import.meta.env.VITE_API_URL ?? '';
 
                       // Ensure URL starts with /uploads/ if it's just a filename
                       let url = rawUrl;

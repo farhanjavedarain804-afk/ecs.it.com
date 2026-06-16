@@ -39,7 +39,7 @@ const PublicVerify = () => {
     setError(null);
     setResult(null);
 
-    const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+    const API_URL = import.meta.env.VITE_API_URL ?? '';
     try {
       const res = await fetch(`${API_URL}/api/public/verify/${verifyId.trim()}`);
       if (!res.ok) {

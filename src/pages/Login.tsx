@@ -69,7 +69,7 @@ const Login = () => {
       // Log login activity via backend
       try {
         const token = localStorage.getItem('ecs_token');
-        const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+        const API_URL = import.meta.env.VITE_API_URL ?? '';
         await fetch(`${API_URL}/api/user_activity_logs`, {
           method: 'POST',
           headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
