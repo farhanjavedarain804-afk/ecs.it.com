@@ -1,4 +1,6 @@
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+// In production (same server), VITE_API_URL is empty so requests go to same origin
+// In development, fallback to localhost:5000
+const API_URL = import.meta.env.VITE_API_URL !== undefined ? import.meta.env.VITE_API_URL : 'http://localhost:5000';
 
 class ApiClient {
     private token: string | null = localStorage.getItem('ecs_token');
