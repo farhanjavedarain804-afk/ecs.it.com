@@ -1,8 +1,8 @@
-import { Toaster } from "@/components/ui/toaster";
+﻿import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
+import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { AuthProvider, AppRole } from "@/contexts/AuthContext";
 import Login from "./pages/Login";
 import Dashboard from "./pages/Dashboard";
@@ -27,6 +27,13 @@ import ProtectedRoute from "./components/ProtectedRoute";
 import NotFound from "./pages/NotFound";
 import MaintenanceOverlay from "./components/MaintenanceOverlay";
 
+// Landing Pages
+import Home from "./pages/landing/Home";
+import About from "./pages/landing/About";
+import ContactPage from "./pages/landing/Contact";
+import Services from "./pages/landing/Services";
+import VerificationPage from "./pages/landing/Verification";
+
 const queryClient = new QueryClient();
 
 const DashboardPage = ({ children, requiredRoles }: { children: React.ReactNode, requiredRoles?: AppRole | AppRole[] }) => (
@@ -44,10 +51,19 @@ const App = () => (
         <BrowserRouter>
           <MaintenanceOverlay />
           <Routes>
-            <Route path="/" element={<Navigate to="/login" replace />} />
+            {/* Landing Pages */}
+            <Route path="/" element={<Home />} />
+            <Route path="/about" element={<About />} />
+            <Route path="/services" element={<Services />} />
+            <Route path="/contact" element={<ContactPage />} />
+            <Route path="/verification" element={<VerificationPage />} />
+
+            {/* Auth */}
             <Route path="/login" element={<Login />} />
             <Route path="/verify" element={<PublicVerify />} />
             <Route path="/verify/:id" element={<PublicVerify />} />
+
+            {/* Dashboard */}
             <Route path="/dashboard" element={<DashboardPage><Dashboard /></DashboardPage>} />
             <Route path="/dashboard/complaints" element={<DashboardPage requiredRoles={["super_admin", "branch_admin"]}><Complaints /></DashboardPage>} />
             <Route path="/dashboard/customers" element={<DashboardPage requiredRoles={["super_admin", "branch_admin"]}><Customers /></DashboardPage>} />

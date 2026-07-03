@@ -54,6 +54,17 @@
     --gradient-hero: linear-gradient(135deg, hsl(222 50% 8%) 0%, hsl(230 45% 18%) 50%, hsl(260 40% 15%) 100%);
     --gradient-accent: linear-gradient(135deg, hsl(230 75% 55%) 0%, hsl(260 60% 55%) 100%);
     --gradient-gold: linear-gradient(135deg, hsl(38 95% 55%) 0%, hsl(30 95% 50%) 100%);
+
+    /* ECS Landing Page brand tokens */
+    --brand-blue: hsl(230 75% 55%);
+    --brand-red: hsl(350 70% 50%);
+    --brand-yellow: hsl(38 95% 55%);
+    --gradient-brand: linear-gradient(135deg, hsl(230 75% 55%) 0%, hsl(350 70% 50%) 100%);
+    --gradient-spark: linear-gradient(135deg, hsl(38 95% 55%) 0%, hsl(350 70% 50%) 100%);
+    --gradient-mesh: radial-gradient(at 20% 30%, hsl(230 75% 55% / 0.35) 0px, transparent 50%), radial-gradient(at 80% 10%, hsl(38 95% 55% / 0.25) 0px, transparent 50%), radial-gradient(at 70% 80%, hsl(350 70% 50% / 0.30) 0px, transparent 50%);
+    --shadow-brand: 0 20px 60px -20px hsl(230 75% 55% / 0.45);
+    --shadow-spark: 0 16px 40px -16px hsl(350 70% 50% / 0.40);
+    --shadow-glass: 0 8px 32px hsl(222 47% 11% / 0.18);
     --gradient-card: linear-gradient(145deg, hsl(0 0% 100%) 0%, hsl(220 20% 97%) 100%);
     --gradient-success: linear-gradient(135deg, hsl(150 60% 45%) 0%, hsl(170 60% 40%) 100%);
 
@@ -191,6 +202,22 @@
     background: hsl(222 50% 8% / 0.85);
     border: 1px solid hsl(230 75% 55% / 0.15);
   }
+
+  /* Landing page specific utilities */
+  .bg-gradient-brand { background-image: var(--gradient-brand); }
+  .bg-gradient-spark { background-image: var(--gradient-spark); }
+  .bg-gradient-hero { background-image: var(--gradient-hero); }
+  .bg-gradient-mesh { background-image: var(--gradient-mesh); }
+  .shadow-brand { box-shadow: var(--shadow-brand); }
+  .shadow-spark { box-shadow: var(--shadow-spark); }
+  .text-brand-yellow { color: var(--brand-yellow); }
+  .text-brand-red { color: var(--brand-red); }
+  .text-brand-blue { color: var(--brand-blue); }
+  .bg-brand-red\/30 { background-color: hsl(350 70% 50% / 0.3); }
+  .bg-brand-yellow\/20 { background-color: hsl(38 95% 55% / 0.2); }
+  .animate-ecs-float { animation: ecs-float 6s ease-in-out infinite; }
+  .animate-ecs-spark { animation: ecs-spark 2.5s ease-in-out infinite; }
+  .animate-ecs-pulse-ring { animation: ecs-pulse-ring 1.8s ease-out infinite; }
 }
 
 @keyframes float {
@@ -239,4 +266,17 @@
   100% {
     background-position: 0% 50%;
   }
+}
+
+@keyframes ecs-float {
+  0%, 100% { transform: translateY(0px); }
+  50% { transform: translateY(-12px); }
+}
+@keyframes ecs-spark {
+  0%, 100% { opacity: 0.4; transform: scale(1); }
+  50% { opacity: 1; transform: scale(1.1); }
+}
+@keyframes ecs-pulse-ring {
+  0% { box-shadow: 0 0 0 0 hsl(38 95% 55% / 0.6); }
+  100% { box-shadow: 0 0 0 24px hsl(38 95% 55% / 0); }
 }
