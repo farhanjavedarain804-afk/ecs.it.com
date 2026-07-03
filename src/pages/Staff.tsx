@@ -277,7 +277,12 @@ const Staff = () => {
                   </select>
                 </div>
                 <div><label className="text-sm font-medium text-card-foreground mb-1 block">Status</label>
-                  <select value={form.status} onChange={(e) => setForm({ ...form, status: e.target.value })} className={inputCls}>
+                  <select 
+                    value={form.status} 
+                    onChange={(e) => setForm({ ...form, status: e.target.value })} 
+                    className={inputCls}
+                    disabled={editingId && staff.find((s: any) => s.id === editingId)?.status === 'terminated'}
+                  >
                     <option value="active">Active</option><option value="inactive">Inactive</option><option value="terminated">Terminated</option>
                   </select>
                 </div>

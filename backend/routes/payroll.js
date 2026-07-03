@@ -87,7 +87,8 @@ router.get('/staff', auth(['view_only', 'manager']), async (req, res) => {
     try {
         const { branch_id } = req.query;
         // Relaxed status filter to ensure staff are visible; usually active but showing all for transparency
-        let query = 'SELECT s.id, s.employee_id, s.full_name, s.designation, s.salary, b.name as branch_name FROM staff s LEFT JOIN branches b ON s.branch_id = b.id WHERE 1=1';
+        // Update: Now only showing 'active' staff for new payroll entries as per new requirement
+        let query = "SELECT s.id, s.employee_id, s.full_name, s.designation, s.salary, b.name as branch_name FROM staff s LEFT JOIN branches b ON s.branch_id = b.id WHERE s.status = 'active'";
         let params = [];
 
         if (branch_id) {

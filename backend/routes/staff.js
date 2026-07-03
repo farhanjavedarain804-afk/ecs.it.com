@@ -7,7 +7,7 @@ const auth = require('../middleware/auth');
 // @desc    Get all staff members
 router.get('/', auth(), async (req, res) => {
     try {
-        const { branch_id, employee_id } = req.query;
+        const { branch_id, employee_id, status } = req.query;
         let query = 'SELECT s.*, b.name as branch_name FROM staff s LEFT JOIN branches b ON s.branch_id = b.id WHERE 1=1';
         let params = [];
 
@@ -23,6 +23,11 @@ router.get('/', auth(), async (req, res) => {
         if (employee_id) {
             query += ' AND s.employee_id LIKE ?';
             params.push(`%${employee_id}%`);
+        }
+
+        if (status) {
+            query += ' AND s.status = ?';
+            params.push(status);
         }
 
         const [results] = await pool.query(query, params);
