@@ -91,6 +91,10 @@ export const generateAppointmentLetter = async (data: any) => {
     doc.text(data.full_name || "Employee Name", margin, y);
     y += 5;
     doc.setFont("helvetica", "normal");
+    if (data.cnic) {
+        doc.text(`CNIC: ${data.cnic}`, margin, y);
+        y += 5;
+    }
     const addressLines = doc.splitTextToSize(data.address || "Employee Address", pageWidth / 2);
     doc.text(addressLines, margin, y);
     y += (addressLines.length * 5) + 10;
@@ -115,7 +119,7 @@ export const generateAppointmentLetter = async (data: any) => {
         { title: "1. Position & Duties", content: `You will be employed as ${data.designation || '[Job Title]'} and will report to the department head or assigned supervisor. Your duties and responsibilities will include tasks assigned by management related to your role.` },
         { title: "2. Probation Period", content: "Your employment will be subject to a probation period of 3 months starting from your joining date. During this period, your performance and suitability for the position will be evaluated. The company reserves the right to extend or terminate the probation period if required." },
         { title: "3. Salary & Compensation", content: `Your monthly salary will be ${Number(data.salary || 0).toLocaleString()} PKR, payable on a monthly basis. Any additional allowances, bonuses, or benefits will be provided in accordance with company policies.` },
-        { title: "4. Working Hours", content: "Your normal working hours will be 09:00 AM – 06:00 PM, 6 days a week. The company may require you to work additional hours when necessary to meet business needs." },
+        { title: "4. Working Hours", content: "Your normal working hours will be 09:00 AM – 09:00 PM, 6 days a week. The company may require you to work additional hours when necessary to meet business needs." },
         { title: "5. Leave Policy", content: "You will be entitled to leave as per the company’s leave policy, including annual leave, sick leave, and public holidays." },
         { title: "6. Confidentiality", content: "You are required to maintain strict confidentiality regarding all company information, documents, clients, and internal matters during and after your employment." },
         { title: "7. Code of Conduct", content: "You are expected to follow the company’s policies, rules, and professional standards at all times." },
