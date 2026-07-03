@@ -1,4 +1,6 @@
 import { jsPDF } from "jspdf";
+import { loadLogoForPDF } from "./logoLoader";
+
 
 export const generateAppointmentLetter = async (data: any) => {
     const doc = new jsPDF();
@@ -32,19 +34,9 @@ export const generateAppointmentLetter = async (data: any) => {
         console.error("Error fetching company settings:", err);
     }
 
-    // 2. Load Logo
-    let logoBase64: string | null = null;
-    try {
-        const res = await fetch('/LOGO.png');
-        const blob = await res.blob();
-        logoBase64 = await new Promise<string>((resolve) => {
-            const reader = new FileReader();
-            reader.onloadend = () => resolve(reader.result as string);
-            reader.readAsDataURL(blob);
-        });
-    } catch (err) {
-        console.warn('Could not load logo:', err);
-    }
+    // Load logo with white background compositing (prevents black on transparent PNG)
+    const logoBase64 = await loadLogoForPDF('/LOGO.png');
+
 
     const drawHeader = () => {
         if (logoBase64) {

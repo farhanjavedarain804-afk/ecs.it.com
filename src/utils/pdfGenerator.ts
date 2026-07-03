@@ -1,5 +1,7 @@
 import { jsPDF } from "jspdf";
 import QRCode from "qrcode";
+import { loadLogoForPDF } from "./logoLoader";
+
 export const generatePDF = async (type: 'welcome_note' | 'complaint_receipt' | 'employee_letter' | 'invoice' | 'salary_slip', data: any) => {
     const doc = new jsPDF();
     const pageWidth = doc.internal.pageSize.getWidth();
@@ -8,19 +10,9 @@ export const generatePDF = async (type: 'welcome_note' | 'complaint_receipt' | '
     // Force white background — prevents dark-mode CSS bleeding into PDF
     doc.setFillColor(255, 255, 255);
     doc.rect(0, 0, pageWidth, pageHeight, 'F');
-    // Load logo from public folder
-    let logoBase64: string | null = null;
-    try {
-        const res = await fetch('/LOGO.png');
-        const blob = await res.blob();
-        logoBase64 = await new Promise<string>((resolve) => {
-            const reader = new FileReader();
-            reader.onloadend = () => resolve(reader.result as string);
-            reader.readAsDataURL(blob);
-        });
-    } catch (err) {
-        console.warn('Could not load logo:', err);
-    }
+    // Load logo with white background compositing (prevents black on transparent PNG)
+    const logoBase64 = await loadLogoForPDF('/LOGO.png');
+
 
     const addLogo = (x: number, y: number, w: number, h: number) => {
         if (logoBase64) {
@@ -912,18 +904,9 @@ export const exportTableToPDF = async (title: string, headers: string[], rows: a
     doc.setFillColor(255, 255, 255);
     doc.rect(0, 0, pageWidth, pageHeight, 'F');
 
-    let logoBase64: string | null = null;
-    try {
-        const res = await fetch('/LOGO.png');
-        const blob = await res.blob();
-        logoBase64 = await new Promise<string>((resolve) => {
-            const reader = new FileReader();
-            reader.onloadend = () => resolve(reader.result as string);
-            reader.readAsDataURL(blob);
-        });
-    } catch (err) {
-        console.warn('Could not load logo:', err);
-    }
+    // Load logo with white background compositing (prevents black on transparent PNG)
+    const logoBase64 = await loadLogoForPDF('/LOGO.png');
+
 
     let settings = { company_name: 'Electric Complaint Solutions' };
     try {
