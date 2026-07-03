@@ -2,7 +2,7 @@ const express = require('express');
 const router = express.Router();
 const pool = require('../config/db');
 const auth = require('../middleware/auth');
-const { v4: uuidv4 } = require('uuid');
+const crypto = require('crypto');
 
 // @route   POST /api/service-requests/public
 // @desc    Submit a new service request from the public landing page
@@ -15,7 +15,7 @@ router.post('/public', async (req, res) => {
             return res.status(400).json({ error: 'Please provide all required fields' });
         }
 
-        const id = uuidv4();
+        const id = crypto.randomUUID();
         await pool.query(`
             INSERT INTO service_requests 
             (id, name, phone, email, service_required, city_branch, status)
