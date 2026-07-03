@@ -9,15 +9,16 @@ import { SERVICES } from "./services-data";
 const schema = z.object({
   name: z.string().trim().min(2).max(100),
   phone: z.string().trim().min(7).max(20),
-  email: z.string().trim().email().max(255),
+  email: z.string().trim().email().max(255).optional().or(z.literal("")),
   service: z.string().min(1),
-  message: z.string().trim().min(5).max(1000),
+  city: z.string().min(1),
+  message: z.string().trim().max(1000).optional(),
 });
 
 export function Contact() {
   const [state, setState] = useState<{ status: "idle" | "submitting" | "done" | "error"; error?: string }>({ status: "idle" });
 
-  const onSubmit = (e: React.FormEvent<HTMLFormElement>) => {
+  const onSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     const fd = new FormData(e.currentTarget);
     const parsed = schema.safeParse(Object.fromEntries(fd));
@@ -26,7 +27,24 @@ export function Contact() {
       return;
     }
     setState({ status: "submitting" });
-    setTimeout(() => setState({ status: "done" }), 900);
+    try {
+      const API_URL = import.meta.env.VITE_API_URL || '';
+      const res = await fetch(`${API_URL}/api/service_requests/public`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: parsed.data.name,
+          phone: parsed.data.phone,
+          email: parsed.data.email,
+          service_required: parsed.data.service,
+          city_branch: parsed.data.city,
+        }),
+      });
+      if (!res.ok) throw new Error("Failed to submit");
+      setState({ status: "done" });
+    } catch (err: any) {
+      setState({ status: "error", error: "Connection error. Please try again later." });
+    }
   };
 
   return (

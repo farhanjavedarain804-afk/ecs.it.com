@@ -15,6 +15,7 @@ type NavItem = { label: string; icon: any; path: string; roles?: string[] };
 
 const allNavItems: NavItem[] = [
   { label: "Dashboard", icon: LayoutDashboard, path: "/dashboard", roles: ["super_admin", "branch_admin"] },
+  { label: "Service Requests", icon: FileText, path: "/dashboard/service-requests", roles: ["super_admin", "branch_admin"] },
   { label: "Complaints", icon: ClipboardList, path: "/dashboard/complaints", roles: ["super_admin", "branch_admin"] },
   { label: "Customers", icon: Users, path: "/dashboard/customers", roles: ["super_admin", "branch_admin"] },
   { label: "Services & Parts", icon: Wrench, path: "/dashboard/services-products", roles: ["super_admin", "branch_admin"] },

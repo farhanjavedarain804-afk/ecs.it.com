@@ -82,6 +82,7 @@ app.use('/api/payroll', require('./routes/payroll'));
 app.use('/api/analytics', require('./routes/analytics'));
 app.use('/api/payments', require('./routes/payments'));
 app.use('/api/public', require('./routes/public'));
+app.use('/api/service_requests', require('./routes/serviceRequests'));
 
 // Serve Frontend (Production) - Serves built Vite files from ../dist
 const distPath = path.join(__dirname, '..', 'dist');

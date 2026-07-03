@@ -1,4 +1,4 @@
-﻿import { Toaster } from "@/components/ui/toaster";
+import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
@@ -22,6 +22,7 @@ import CustomerReviews from "@/pages/CustomerReviews";
 import Payroll from "./pages/Payroll";
 import Payments from "./pages/Payments";
 import PublicVerify from "./pages/PublicVerify";
+import ServiceRequests from "./pages/ServiceRequests";
 import DashboardLayout from "./components/DashboardLayout";
 import ProtectedRoute from "./components/ProtectedRoute";
 import NotFound from "./pages/NotFound";
@@ -80,6 +81,7 @@ const App = () => (
             <Route path="/dashboard/user-activity" element={<DashboardPage requiredRoles={["super_admin"]}><UserActivity /></DashboardPage>} />
             <Route path="/dashboard/customer-reviews" element={<DashboardPage requiredRoles={["super_admin", "branch_admin"]}><CustomerReviews /></DashboardPage>} />
             <Route path="/dashboard/settings" element={<DashboardPage requiredRoles={["super_admin"]}><Settings /></DashboardPage>} />
+            <Route path="/dashboard/service-requests" element={<DashboardPage requiredRoles={["super_admin", "branch_admin"]}><ServiceRequests /></DashboardPage>} />
             <Route path="*" element={<NotFound />} />
           </Routes>
         </BrowserRouter>

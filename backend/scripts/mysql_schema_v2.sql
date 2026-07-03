@@ -268,4 +268,17 @@ CREATE TABLE IF NOT EXISTS activity_logs (
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 ) ENGINE=InnoDB;
 
+-- 18. Service Requests
+CREATE TABLE IF NOT EXISTS service_requests (
+    id VARCHAR(36) PRIMARY KEY,
+    name VARCHAR(255) NOT NULL,
+    phone VARCHAR(50) NOT NULL,
+    email VARCHAR(255),
+    service_required VARCHAR(100) NOT NULL,
+    city_branch VARCHAR(100) NOT NULL,
+    status ENUM('pending', 'contacted', 'converted_to_complaint', 'rejected') DEFAULT 'pending',
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+) ENGINE=InnoDB;
+
 SET FOREIGN_KEY_CHECKS = 1;
