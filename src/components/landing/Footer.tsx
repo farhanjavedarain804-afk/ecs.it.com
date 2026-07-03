@@ -55,7 +55,7 @@ export function Footer() {
         </div>
         <div className="mt-12 pt-6 border-t border-white/10 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-white/60">
           <p>© {new Date().getFullYear()} Electric Complaint Solutions. All rights reserved.</p>
-          <p>Crafted with precision · DMS powered platform</p>
+          <p>Developed By Devionic (Private) Limited | +92-317-7121841 Whatsapp | <a href="https://www.devionic.com" target="_blank" rel="noreferrer" className="hover:text-white transition-colors">www.devionic.com</a> | info@devionic.com</p>
         </div>
       </div>
     </footer>

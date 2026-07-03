@@ -196,6 +196,10 @@ export default function Login() {
             </form>
           </div>
         </div>
+
+        <div className="p-5 text-center text-[10px] sm:text-xs text-muted-foreground/70">
+          Developed By Devionic (Private) Limited | +92-317-7121841 Whatsapp | <a href="https://www.devionic.com" target="_blank" rel="noreferrer" className="hover:text-primary transition-colors">www.devionic.com</a> | info@devionic.com
+        </div>
       </main>
     </div>
   );
