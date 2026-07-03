@@ -74,10 +74,10 @@ export default function Payroll() {
     const fetchStaff = async () => {
         setLoading(true);
         try {
-            const url = new URL(`${API_URL}/api/payroll/staff`);
-            if (selectedBranch !== "all") url.searchParams.append("branch_id", selectedBranch);
+            let url = `${API_URL}/api/payroll/staff`;
+            if (selectedBranch !== "all") url += `?branch_id=${selectedBranch}`;
 
-            const res = await fetch(url.toString(), {
+            const res = await fetch(url, {
                 headers: { "Authorization": `Bearer ${localStorage.getItem("ecs_token")}` }
             });
             const data = await res.json();
@@ -93,10 +93,10 @@ export default function Payroll() {
     const fetchSlips = async () => {
         setLoading(true);
         try {
-            const url = new URL(`${API_URL}/api/payroll/slips`);
-            if (selectedBranch !== "all") url.searchParams.append("branch_id", selectedBranch);
+            let url = `${API_URL}/api/payroll/slips`;
+            if (selectedBranch !== "all") url += `?branch_id=${selectedBranch}`;
 
-            const res = await fetch(url.toString(), {
+            const res = await fetch(url, {
                 headers: { "Authorization": `Bearer ${localStorage.getItem("ecs_token")}` }
             });
             const data = await res.json();
@@ -112,10 +112,10 @@ export default function Payroll() {
     const fetchAdvances = async () => {
         setLoading(true);
         try {
-            const url = new URL(`${API_URL}/api/payroll/advances`);
-            if (selectedBranch !== "all") url.searchParams.append("branch_id", selectedBranch);
+            let url = `${API_URL}/api/payroll/advances`;
+            if (selectedBranch !== "all") url += `?branch_id=${selectedBranch}`;
 
-            const res = await fetch(url.toString(), {
+            const res = await fetch(url, {
                 headers: { "Authorization": `Bearer ${localStorage.getItem("ecs_token")}` }
             });
             const data = await res.json();
