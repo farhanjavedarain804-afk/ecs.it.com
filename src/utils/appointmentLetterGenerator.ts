@@ -6,6 +6,10 @@ export const generateAppointmentLetter = async (data: any) => {
     const pageHeight = doc.internal.pageSize.getHeight();
     const margin = 20;
 
+    // Force white background — prevents dark-mode CSS bleeding into PDF
+    doc.setFillColor(255, 255, 255);
+    doc.rect(0, 0, pageWidth, pageHeight, 'F');
+
     // 1. Fetch Company Settings
     let settings = {
         company_name: 'Electric Complaint Solutions',
@@ -143,8 +147,12 @@ export const generateAppointmentLetter = async (data: any) => {
 
     // --- Start Page 2 ---
     doc.addPage();
+    // Force white background on new page
+    doc.setFillColor(255, 255, 255);
+    doc.rect(0, 0, pageWidth, pageHeight, 'F');
     drawHeader();
     y = 45; // Same Y start for secondary pages
+
 
     // --- Draw Remaining 5 Points on Page 2 ---
     doc.setTextColor(0);

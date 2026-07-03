@@ -3,7 +3,11 @@ import QRCode from "qrcode";
 export const generatePDF = async (type: 'welcome_note' | 'complaint_receipt' | 'employee_letter' | 'invoice' | 'salary_slip', data: any) => {
     const doc = new jsPDF();
     const pageWidth = doc.internal.pageSize.getWidth();
+    const pageHeight = doc.internal.pageSize.getHeight();
 
+    // Force white background — prevents dark-mode CSS bleeding into PDF
+    doc.setFillColor(255, 255, 255);
+    doc.rect(0, 0, pageWidth, pageHeight, 'F');
     // Load logo from public folder
     let logoBase64: string | null = null;
     try {
@@ -674,6 +678,10 @@ export const generatePaymentsReport = async (history: any[], title: string = "Pa
     const doc = new jsPDF('p', 'mm', 'a4');
     const pageWidth = doc.internal.pageSize.getWidth();
     const margin = 15;
+
+    // Force white background
+    doc.setFillColor(255, 255, 255);
+    doc.rect(0, 0, pageWidth, doc.internal.pageSize.getHeight(), 'F');
     
     // Header
     doc.setFillColor(30, 58, 138);
@@ -708,6 +716,9 @@ export const generatePaymentsReport = async (history: any[], title: string = "Pa
     history.forEach((row, i) => {
         if (y > 270) {
             doc.addPage();
+            // Force white background on new page
+            doc.setFillColor(255, 255, 255);
+            doc.rect(0, 0, pageWidth, 297, 'F');
             y = 20;
             // Redraw header on new page if needed
         }
@@ -756,6 +767,10 @@ export const generateDetailedReport = async (stats: any) => {
     const doc = new jsPDF('p', 'mm', 'a4');
     const pageWidth = doc.internal.pageSize.getWidth();
     const margin = 20;
+
+    // Force white background
+    doc.setFillColor(255, 255, 255);
+    doc.rect(0, 0, pageWidth, doc.internal.pageSize.getHeight(), 'F');
     
     // Header
     doc.setFillColor(30, 58, 138);
@@ -893,6 +908,10 @@ export const exportTableToPDF = async (title: string, headers: string[], rows: a
     const margin = 15;
     let y = 45;
 
+    // Force white background
+    doc.setFillColor(255, 255, 255);
+    doc.rect(0, 0, pageWidth, pageHeight, 'F');
+
     let logoBase64: string | null = null;
     try {
         const res = await fetch('/LOGO.png');
@@ -977,6 +996,9 @@ export const exportTableToPDF = async (title: string, headers: string[], rows: a
     rows.forEach((row, rowIndex) => {
         if (y + rowHeight > pageHeight - margin) {
             doc.addPage('a4', 'l');
+            // Force white background on new page
+            doc.setFillColor(255, 255, 255);
+            doc.rect(0, 0, pageWidth, pageHeight, 'F');
             currentPage++;
             y = 56;
             drawHeader(currentPage);

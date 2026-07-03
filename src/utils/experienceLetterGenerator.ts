@@ -6,6 +6,10 @@ export const generateExperienceLetter = async (data: any) => {
     const pageHeight = doc.internal.pageSize.getHeight();
     const margin = 20;
 
+    // Force white background — prevents dark-mode CSS bleeding into PDF
+    doc.setFillColor(255, 255, 255);
+    doc.rect(0, 0, pageWidth, pageHeight, 'F');
+
     // 1. Fetch Company Settings
     let settings = {
         company_name: 'Electric Complaint Solutions',
