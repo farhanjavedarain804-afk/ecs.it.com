@@ -18,8 +18,9 @@ router.get('/verify/:id', async (req, res) => {
             FROM invoices i
             LEFT JOIN branches b ON i.branch_id = b.id
             LEFT JOIN customers c ON i.customer_id = c.id
-            WHERE i.verification_id = ? OR i.invoice_number = ?
-        `, [input, input]);
+            WHERE i.verification_id = ? OR i.invoice_number = ? OR i.id = ?
+        `, [input, input, input]);
+
 
         if (invoices.length > 0) {
             const row = invoices[0];
@@ -47,8 +48,9 @@ router.get('/verify/:id', async (req, res) => {
             FROM complaints c
             LEFT JOIN branches b ON c.branch_id = b.id
             LEFT JOIN customers cust ON c.customer_id = cust.id
-            WHERE c.complaint_number = ?
-        `, [input]);
+            WHERE c.verification_id = ? OR c.complaint_number = ? OR c.id = ?
+        `, [input, input, input]);
+
 
         if (complaints.length > 0) {
             const row = complaints[0];
@@ -73,8 +75,9 @@ router.get('/verify/:id', async (req, res) => {
                    b.name as branch_name, s.cnic, s.contact_1
             FROM staff s
             LEFT JOIN branches b ON s.branch_id = b.id
-            WHERE s.employee_id = ?
-        `, [input]);
+            WHERE s.employee_id = ? OR s.id = ?
+        `, [input, input]);
+
 
         if (staff.length > 0) {
             return res.json({
@@ -97,8 +100,9 @@ router.get('/verify/:id', async (req, res) => {
         const [branches] = await pool.query(`
             SELECT branch_code, name, address, city, phone, is_active
             FROM branches
-            WHERE branch_code = ?
-        `, [input]);
+            WHERE branch_code = ? OR name = ? OR id = ?
+        `, [input, input, input]);
+
 
         if (branches.length > 0) {
             return res.json({
@@ -123,8 +127,9 @@ router.get('/verify/:id', async (req, res) => {
             FROM salary_slips ss
             JOIN staff s ON ss.staff_id = s.id
             LEFT JOIN branches b ON s.branch_id = b.id
-            WHERE ss.verification_id = ? OR ss.slip_number = ?
-        `, [input, input]);
+            WHERE ss.verification_id = ? OR ss.slip_number = ? OR ss.id = ?
+        `, [input, input, input]);
+
 
         if (slips.length > 0) {
             const row = slips[0];
