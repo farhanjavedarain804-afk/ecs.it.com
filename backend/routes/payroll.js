@@ -56,30 +56,7 @@ runMigration();
 // Helper to check if user is Head Office
 const isHO = (role) => role === 'super_admin' || role === 'developer';
 
-// Helper to add financial entry
-const addFinancialEntry = async (connection, branch_id, type, amount, description, userId, refId = null) => {
-    const id = crypto.randomUUID();
-    const prefix = 'ECS-FIN-';
-    const [maxRes] = await connection.query(
-        "SELECT MAX(CAST(SUBSTRING_INDEX(transaction_id, '-', -1) AS UNSIGNED)) as max_val FROM financial_entries WHERE transaction_id LIKE ?",
-        [prefix + '%']
-    );
-    const nextNum = (maxRes[0].max_val || 0) + 1;
-    const transaction_id = `${prefix}${String(nextNum).padStart(5, '0')}`;
 
-    await connection.query(
-        `INSERT INTO financial_entries (
-            id, branch_id, entry_type, category, amount, 
-            cash_amount, bank_amount, description, transaction_id,
-            entry_date, entry_time, created_by, reference_id
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_DATE, CURRENT_TIME, ?, ?)`,
-        [
-            id, branch_id, type, 'Salary Advance', amount,
-            0, amount, // Defaulting to bank/digital for payroll
-            description, transaction_id, userId, refId
-        ]
-    );
-};
 
 // @route   GET /api/payroll/staff
 // @desc    Get staff filtered by branch for payroll
@@ -215,18 +192,7 @@ router.patch('/pay/:id', auth(['super_admin']), async (req, res) => {
             [id]
         );
 
-        // 3. Record in financial_entries (Branch Ledger) - NEW AUTOMATION
-        await addFinancialEntry(
-            connection,
-            slip.branch_id,
-            'Debit',
-            slip.net_salary,
-            `Monthly Salary Payout: ${slip.full_name}`,
-            req.user.id,
-            id
-        );
-
-        // 4. Record in branch_settlements (Deducted from HO)
+        // 3. Record in branch_settlements (Deducted from HO)
         const settlementId = crypto.randomUUID();
         await connection.query(
             `INSERT INTO branch_settlements (id, from_branch_id, to_branch_id, amount, transfer_type, description, created_by, reference_id)
@@ -331,10 +297,7 @@ router.delete('/slips/:id', auth(['super_admin']), async (req, res) => {
             [id]
         );
 
-        // 3. Delete from financial ledger (Reverse Debit/Expense)
-        await connection.query("DELETE FROM financial_entries WHERE reference_id = ?", [id]);
-
-        // 4. Delete from branch_settlements (Restore HO Balance)
+        // 2. Delete from branch_settlements (Restore HO Balance)
         await connection.query("DELETE FROM branch_settlements WHERE reference_id = ?", [id]);
 
         await connection.commit();
@@ -445,18 +408,7 @@ router.patch('/advance/:id/pay', auth(['super_admin', 'developer']), async (req,
             [id]
         );
 
-        // 3. Add to financial ledger
-        await addFinancialEntry(
-            connection,
-            adv.branch_id,
-            'Debit',
-            adv.amount,
-            `Paid Salary Advance: ${adv.full_name} (${adv.purpose || 'No purpose listed'})`,
-            req.user.id,
-            id
-        );
-
-        // 4. Record in branch_settlements (Deducted from HO)
+        // 3. Record in branch_settlements (Deducted from HO)
         await connection.query(
             `INSERT INTO branch_settlements (id, from_branch_id, to_branch_id, amount, transfer_type, description, created_by, reference_id)
              VALUES (?, NULL, ?, ?, 'Salary', ?, ?, ?)`,
@@ -516,10 +468,7 @@ router.delete('/advances/:id', auth(['super_admin', 'developer']), async (req, r
             return res.status(400).json({ error: 'Already deducted from salary—cannot delete' });
         }
 
-        // 2. Delete from financial ledger (Reverse Debit/Expense)
-        await connection.query("DELETE FROM financial_entries WHERE reference_id = ?", [id]);
-
-        // 3. Delete from branch_settlements (Restore HO Balance)
+        // 2. Delete from branch_settlements (Restore HO Balance)
         await connection.query("DELETE FROM branch_settlements WHERE reference_id = ?", [id]);
 
         // 4. Delete from advances
