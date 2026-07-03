@@ -151,8 +151,8 @@ const Inventory = () => {
       const headers = { 'Authorization': `Bearer ${localStorage.getItem('ecs_token')}` };
 
       // URLs for backend API
-      const itemsUrl = new URL(`${API_URL}/api/inventory_items`);
-      const logsUrl = new URL(`${API_URL}/api/inventory_logs`);
+      const itemsUrl = new URL(`${API_URL}/api/inventory_items`, window.location.origin);
+      const logsUrl = new URL(`${API_URL}/api/inventory_logs`, window.location.origin);
 
       if (isBranchAdminOnly && branchId) {
         itemsUrl.searchParams.append('branch_id', branchId);
