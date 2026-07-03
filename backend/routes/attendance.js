@@ -23,7 +23,7 @@ const getPKTDateTime = () => {
 // @route   GET /api/attendance
 router.get('/', auth(), async (req, res) => {
     try {
-        const { branch_id, staff_id, date, month, year } = req.query;
+        const { branch_id, staff_id, date, month, year, all_records } = req.query;
         let query = `
             SELECT 
                 a.id, a.staff_id, a.branch_id, a.status, a.notes,
@@ -57,7 +57,9 @@ router.get('/', auth(), async (req, res) => {
             query += ' AND a.attendance_date = ?';
             params.push(date);
         }
-        if (month && year) {
+        if (all_records === 'true') {
+            // No date filter, fetch all
+        } else if (month && year) {
             query += ' AND MONTH(a.attendance_date) = ? AND YEAR(a.attendance_date) = ?';
             params.push(month, year);
         } else if (!date) {

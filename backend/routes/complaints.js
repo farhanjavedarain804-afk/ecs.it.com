@@ -6,7 +6,7 @@ const auth = require('../middleware/auth');
 // @route   GET /api/complaints
 router.get('/', auth(), async (req, res) => {
     try {
-        const { branch_id, search, complaint_number, customer_id, month, year } = req.query;
+        const { branch_id, search, complaint_number, customer_id, month, year, all_records } = req.query;
         let { status } = req.query;
         let statusArray = [];
         if (status) {
@@ -59,7 +59,9 @@ router.get('/', auth(), async (req, res) => {
             params.push(`%${search}%`, `%${search}%`);
         }
 
-        if (month && year) {
+        if (all_records === 'true') {
+            // No date filter, fetch all records
+        } else if (month && year) {
             query += ' AND MONTH(c.created_at) = ? AND YEAR(c.created_at) = ?';
             params.push(month, year);
         } else {

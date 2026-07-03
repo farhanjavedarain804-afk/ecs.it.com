@@ -21,7 +21,7 @@ const Financial = () => {
   const [showForm, setShowForm] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
-  const [filterMonth, setFilterMonth] = useState("all");
+  const [filterMonth, setFilterMonth] = useState("last_2_months");
   const { user, hasRole, profile, isDeveloper } = useAuth();
   const isAdminOrDev = hasRole("super_admin") || isDeveloper;
   const { toast } = useToast();
@@ -59,7 +59,9 @@ const Financial = () => {
         url += `?branch_id=${branchId}`;
         setForm(prev => ({ ...prev, branch_id: branchId }));
       }
-      if (filterMonth !== "all") {
+      if (filterMonth === "all_records") {
+        url += `${url.includes('?') ? '&' : '?'}all_records=true`;
+      } else if (filterMonth !== "last_2_months") {
         const [y, m] = filterMonth.split("-");
         url += `${url.includes('?') ? '&' : '?'}month=${m}&year=${y}`;
       }
@@ -261,7 +263,8 @@ const Financial = () => {
           />
         </div>
         <select value={filterMonth} onChange={(e) => setFilterMonth(e.target.value)} className="rounded-lg border border-input bg-background px-4 py-2 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-ring min-w-[150px]">
-          <option value="all">Last 2 Months</option>
+          <option value="last_2_months">Last 2 Months</option>
+          <option value="all_records">All Records</option>
           {Array.from({ length: 12 }, (_, i) => {
             const date = new Date(new Date().getFullYear(), i, 1);
             const val = `${date.getFullYear()}-${String(i + 1).padStart(2, '0')}`;

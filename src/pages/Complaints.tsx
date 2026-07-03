@@ -28,7 +28,7 @@ const Complaints = () => {
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
   const [search, setSearch] = useState("");
-  const [filterMonth, setFilterMonth] = useState("all");
+  const [filterMonth, setFilterMonth] = useState("last_2_months");
   const [filterStatus, setFilterStatus] = useState("");
   const [activeSection, setActiveSection] = useState<"pending" | "overdue" | "critical" | "solved" | "dismissed">("pending");
   const [customers, setCustomers] = useState<any[]>([]);
@@ -120,7 +120,9 @@ const Complaints = () => {
       const headers = { 'Authorization': `Bearer ${localStorage.getItem('ecs_token')}` };
 
       let complaintsUrl = `${API_URL}/api/complaints${isBranchAdmin && branchId ? `?branch_id=${branchId}` : '?'}`;
-      if (filterMonth !== "all") {
+      if (filterMonth === "all_records") {
+        complaintsUrl += `&all_records=true`;
+      } else if (filterMonth !== "last_2_months") {
         const [y, m] = filterMonth.split("-");
         complaintsUrl += `&month=${m}&year=${y}`;
       }
@@ -594,7 +596,8 @@ const Complaints = () => {
               <option value="dismissed">Dismissed</option>
             </select>
             <select value={filterMonth} onChange={(e) => setFilterMonth(e.target.value)} className="rounded-xl border border-input bg-background px-4 py-2.5 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-ring min-w-[150px]">
-              <option value="all">Last 2 Months</option>
+              <option value="last_2_months">Last 2 Months</option>
+              <option value="all_records">All Records</option>
               {Array.from({ length: 12 }, (_, i) => {
                 const date = new Date(new Date().getFullYear(), i, 1);
                 const val = `${date.getFullYear()}-${String(i + 1).padStart(2, '0')}`;

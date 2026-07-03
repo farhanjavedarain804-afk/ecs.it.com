@@ -97,7 +97,7 @@ const Attendance = () => {
   const [activeTab, setActiveTab] = useState<"daily" | "report">("daily");
   const [selMonth, setSelMonth] = useState(new Date().getMonth() + 1);
   const [selYear, setSelYear] = useState(new Date().getFullYear());
-  const [filterMonth, setFilterMonth] = useState("all");
+  const [filterMonth, setFilterMonth] = useState("last_2_months");
   const [branchFilter, setBranchFilter] = useState("");
   const [historyModal, setHistoryModal] = useState<any | null>(null);
 
@@ -113,7 +113,9 @@ const Attendance = () => {
     setLoading(true);
     try {
       let attendanceUrl = `${API}/api/attendance${branchFilter ? `?branch_id=${branchFilter}` : "?"}`;
-      if (filterMonth !== "all") {
+      if (filterMonth === "all_records") {
+        attendanceUrl += `${attendanceUrl.includes("?") && !attendanceUrl.endsWith("?") ? "&" : ""}all_records=true`;
+      } else if (filterMonth !== "last_2_months") {
         const [y, m] = filterMonth.split("-");
         attendanceUrl += `${attendanceUrl.includes("?") && !attendanceUrl.endsWith("?") ? "&" : ""}month=${m}&year=${y}`;
       }
@@ -273,7 +275,8 @@ const Attendance = () => {
         )}
         <div className="flex items-center gap-2">
           <select value={filterMonth} onChange={(e) => setFilterMonth(e.target.value)} className="rounded-xl border border-border bg-card px-4 py-2 text-xs font-bold cursor-pointer">
-            <option value="all">Last 2 Months</option>
+            <option value="last_2_months">Last 2 Months</option>
+            <option value="all_records">All Records</option>
             {Array.from({ length: 12 }, (_, i) => {
               const date = new Date(new Date().getFullYear(), i, 1);
               const val = `${date.getFullYear()}-${String(i + 1).padStart(2, '0')}`;

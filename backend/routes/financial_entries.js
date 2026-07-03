@@ -6,7 +6,7 @@ const auth = require('../middleware/auth');
 // @route   GET /api/financial_entries
 router.get('/', auth(), async (req, res) => {
     try {
-        const { branch_id, month, year } = req.query;
+        const { branch_id, month, year, all_records } = req.query;
         let whereClause = 'WHERE 1=1';
         let params = [];
         
@@ -18,7 +18,9 @@ router.get('/', auth(), async (req, res) => {
             params.push(req.user.branch_id);
         }
 
-        if (month && year) {
+        if (all_records === 'true') {
+            // No date filter, fetch all records
+        } else if (month && year) {
             whereClause += ' AND MONTH(fe.entry_date) = ? AND YEAR(fe.entry_date) = ?';
             params.push(month, year);
         } else {
