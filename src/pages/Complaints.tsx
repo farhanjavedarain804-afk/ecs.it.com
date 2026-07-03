@@ -28,6 +28,7 @@ const Complaints = () => {
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
   const [search, setSearch] = useState("");
+  const [filterMonth, setFilterMonth] = useState("all");
   const [filterStatus, setFilterStatus] = useState("");
   const [activeSection, setActiveSection] = useState<"pending" | "overdue" | "critical" | "solved" | "dismissed">("pending");
   const [customers, setCustomers] = useState<any[]>([]);
@@ -118,8 +119,14 @@ const Complaints = () => {
     try {
       const headers = { 'Authorization': `Bearer ${localStorage.getItem('ecs_token')}` };
 
+      let complaintsUrl = `${API_URL}/api/complaints${isBranchAdmin && branchId ? `?branch_id=${branchId}` : '?'}`;
+      if (filterMonth !== "all") {
+        const [y, m] = filterMonth.split("-");
+        complaintsUrl += `&month=${m}&year=${y}`;
+      }
+      
       const [compRes, custRes, brRes, staffRes] = await Promise.all([
-        fetch(`${API_URL}/api/complaints${isBranchAdmin && branchId ? `?branch_id=${branchId}` : ''}`, { headers }).then(r => r.json()),
+        fetch(complaintsUrl, { headers }).then(r => r.json()),
         fetch(`${API_URL}/api/customers${isBranchAdmin && branchId ? `?branch_id=${branchId}` : ''}`, { headers }).then(r => r.json()),
         fetch(`${API_URL}/api/branches`, { headers }).then(r => r.json()),
         fetch(`${API_URL}/api/staff?status=active${isBranchAdmin && branchId ? `&branch_id=${branchId}` : ''}`, { headers }).then(r => r.json())
@@ -142,7 +149,7 @@ const Complaints = () => {
     }
   };
 
-  useEffect(() => { fetchAll(); }, []);
+  useEffect(() => { fetchAll(); }, [filterMonth]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -585,6 +592,14 @@ const Complaints = () => {
               <option value="completed">Completed</option>
               <option value="solved">Solved</option>
               <option value="dismissed">Dismissed</option>
+            </select>
+            <select value={filterMonth} onChange={(e) => setFilterMonth(e.target.value)} className="rounded-xl border border-input bg-background px-4 py-2.5 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-ring min-w-[150px]">
+              <option value="all">Last 2 Months</option>
+              {Array.from({ length: 12 }, (_, i) => {
+                const date = new Date(new Date().getFullYear(), i, 1);
+                const val = `${date.getFullYear()}-${String(i + 1).padStart(2, '0')}`;
+                return <option key={val} value={val}>{date.toLocaleString('default', { month: 'long', year: 'numeric' })}</option>;
+              })}
             </select>
           </div>
 

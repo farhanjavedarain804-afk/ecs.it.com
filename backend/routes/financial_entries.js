@@ -6,7 +6,7 @@ const auth = require('../middleware/auth');
 // @route   GET /api/financial_entries
 router.get('/', auth(), async (req, res) => {
     try {
-        const { branch_id } = req.query;
+        const { branch_id, month, year } = req.query;
         let whereClause = 'WHERE 1=1';
         let params = [];
         
@@ -17,6 +17,14 @@ router.get('/', auth(), async (req, res) => {
             whereClause += ' AND fe.branch_id = ?';
             params.push(req.user.branch_id);
         }
+
+        if (month && year) {
+            whereClause += ' AND MONTH(fe.entry_date) = ? AND YEAR(fe.entry_date) = ?';
+            params.push(month, year);
+        } else {
+            whereClause += " AND fe.entry_date >= DATE_FORMAT(DATE_SUB(CURRENT_DATE(), INTERVAL 1 MONTH), '%Y-%m-01')";
+        }
+
 
         // 1. Fetch Entries with Running Balance
         // Note: Using a subquery for running balance to ensure compatibility if window functions are tricky with order
@@ -33,7 +41,6 @@ router.get('/', auth(), async (req, res) => {
             LEFT JOIN branches b ON fe.branch_id = b.id
             ${whereClause}
             ORDER BY fe.entry_date DESC, fe.created_at DESC 
-            LIMIT 100
         `;
         
         // Adjust params for subquery

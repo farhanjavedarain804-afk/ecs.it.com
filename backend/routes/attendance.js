@@ -60,6 +60,8 @@ router.get('/', auth(), async (req, res) => {
         if (month && year) {
             query += ' AND MONTH(a.attendance_date) = ? AND YEAR(a.attendance_date) = ?';
             params.push(month, year);
+        } else if (!date) {
+            query += " AND a.attendance_date >= DATE_FORMAT(DATE_SUB(CURRENT_DATE(), INTERVAL 1 MONTH), '%Y-%m-01')";
         }
 
         query += ' ORDER BY a.check_in DESC';

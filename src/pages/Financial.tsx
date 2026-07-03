@@ -21,6 +21,7 @@ const Financial = () => {
   const [showForm, setShowForm] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
+  const [filterMonth, setFilterMonth] = useState("all");
   const { user, hasRole, profile, isDeveloper } = useAuth();
   const isAdminOrDev = hasRole("super_admin") || isDeveloper;
   const { toast } = useToast();
@@ -58,6 +59,10 @@ const Financial = () => {
         url += `?branch_id=${branchId}`;
         setForm(prev => ({ ...prev, branch_id: branchId }));
       }
+      if (filterMonth !== "all") {
+        const [y, m] = filterMonth.split("-");
+        url += `${url.includes('?') ? '&' : '?'}month=${m}&year=${y}`;
+      }
 
       const [entRes, brRes] = await Promise.all([
         fetch(url, { headers: { "Authorization": `Bearer ${token}` } }),
@@ -84,7 +89,7 @@ const Financial = () => {
     }
   };
 
-  useEffect(() => { fetchData(); }, []);
+  useEffect(() => { fetchData(); }, [filterMonth]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -255,6 +260,14 @@ const Financial = () => {
             className="w-full pl-10 pr-4 py-2 bg-background border border-input rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary/20"
           />
         </div>
+        <select value={filterMonth} onChange={(e) => setFilterMonth(e.target.value)} className="rounded-lg border border-input bg-background px-4 py-2 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-ring min-w-[150px]">
+          <option value="all">Last 2 Months</option>
+          {Array.from({ length: 12 }, (_, i) => {
+            const date = new Date(new Date().getFullYear(), i, 1);
+            const val = `${date.getFullYear()}-${String(i + 1).padStart(2, '0')}`;
+            return <option key={val} value={val}>{date.toLocaleString('default', { month: 'long', year: 'numeric' })}</option>;
+          })}
+        </select>
         <div className="flex gap-2">
           <button onClick={handleDownloadReport} className="inline-flex items-center gap-2 rounded-lg border border-primary px-4 py-2.5 text-sm font-semibold text-primary hover:bg-primary/5 transition-all shadow-sm">
             <FileDown className="w-4 h-4" /> Download Report

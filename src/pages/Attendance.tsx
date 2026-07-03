@@ -97,6 +97,7 @@ const Attendance = () => {
   const [activeTab, setActiveTab] = useState<"daily" | "report">("daily");
   const [selMonth, setSelMonth] = useState(new Date().getMonth() + 1);
   const [selYear, setSelYear] = useState(new Date().getFullYear());
+  const [filterMonth, setFilterMonth] = useState("all");
   const [branchFilter, setBranchFilter] = useState("");
   const [historyModal, setHistoryModal] = useState<any | null>(null);
 
@@ -111,10 +112,15 @@ const Attendance = () => {
   const fetchAll = useCallback(async () => {
     setLoading(true);
     try {
+      let attendanceUrl = `${API}/api/attendance${branchFilter ? `?branch_id=${branchFilter}` : "?"}`;
+      if (filterMonth !== "all") {
+        const [y, m] = filterMonth.split("-");
+        attendanceUrl += `${attendanceUrl.includes("?") && !attendanceUrl.endsWith("?") ? "&" : ""}month=${m}&year=${y}`;
+      }
       const [bRes, sRes, aRes] = await Promise.all([
         fetch(`${API}/api/branches`, { headers }),
         fetch(`${API}/api/staff?status=active`, { headers }),
-        fetch(`${API}/api/attendance${branchFilter ? `?branch_id=${branchFilter}` : ""}`, { headers }),
+        fetch(attendanceUrl, { headers }),
       ]);
       if (bRes.ok) setBranches(await bRes.json());
       if (sRes.ok) setAllStaff(await sRes.json());
@@ -131,7 +137,7 @@ const Attendance = () => {
     }
   }, [branchFilter, profile?.branch_id]);
 
-  useEffect(() => { fetchAll(); }, [fetchAll]);
+  useEffect(() => { fetchAll(); }, [fetchAll, filterMonth]);
 
   // Is an employee already checked in TODAY?
   const isAlreadyInToday = useCallback((staffId: string) => {
@@ -253,17 +259,30 @@ const Attendance = () => {
         ))}
       </div>
 
-      {/* Branch Filter (for Both Tabs) */}
-      {hasRole("super_admin") && (
-        <div className="flex items-center gap-3">
-          <MapPin className="w-4 h-4 text-muted-foreground" />
-          <select value={branchFilter} onChange={e => setBranchFilter(e.target.value)}
-            className="rounded-xl border border-border bg-card px-4 py-2 text-xs font-bold cursor-pointer">
-            <option value="">All Branches</option>
-            {branches.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
+      {/* Global Filters */}
+      <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3">
+        {hasRole("super_admin") && (
+          <div className="flex items-center gap-2">
+            <MapPin className="w-4 h-4 text-muted-foreground" />
+            <select value={branchFilter} onChange={e => setBranchFilter(e.target.value)}
+              className="rounded-xl border border-border bg-card px-4 py-2 text-xs font-bold cursor-pointer">
+              <option value="">All Branches</option>
+              {branches.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
+            </select>
+          </div>
+        )}
+        <div className="flex items-center gap-2">
+          <select value={filterMonth} onChange={(e) => setFilterMonth(e.target.value)} className="rounded-xl border border-border bg-card px-4 py-2 text-xs font-bold cursor-pointer">
+            <option value="all">Last 2 Months</option>
+            {Array.from({ length: 12 }, (_, i) => {
+              const date = new Date(new Date().getFullYear(), i, 1);
+              const val = `${date.getFullYear()}-${String(i + 1).padStart(2, '0')}`;
+              return <option key={val} value={val}>{date.toLocaleString('default', { month: 'long', year: 'numeric' })}</option>;
+            })}
           </select>
         </div>
-      )}
+      </div>
+
 
       {activeTab === "daily" ? (
         <div className="grid grid-cols-1 xl:grid-cols-4 gap-8">

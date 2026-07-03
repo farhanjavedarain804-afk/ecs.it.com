@@ -6,7 +6,7 @@ const auth = require('../middleware/auth');
 // @route   GET /api/complaints
 router.get('/', auth(), async (req, res) => {
     try {
-        const { branch_id, search, complaint_number, customer_id } = req.query;
+        const { branch_id, search, complaint_number, customer_id, month, year } = req.query;
         let { status } = req.query;
         let statusArray = [];
         if (status) {
@@ -58,6 +58,15 @@ router.get('/', auth(), async (req, res) => {
             query += ' AND (c.complaint_number LIKE ? OR cust.name LIKE ?)';
             params.push(`%${search}%`, `%${search}%`);
         }
+
+        if (month && year) {
+            query += ' AND MONTH(c.created_at) = ? AND YEAR(c.created_at) = ?';
+            params.push(month, year);
+        } else {
+            // Default to last 2 months (current month and previous month)
+            query += " AND c.created_at >= DATE_FORMAT(DATE_SUB(CURRENT_DATE(), INTERVAL 1 MONTH), '%Y-%m-01')";
+        }
+
         query += ' ORDER BY c.created_at DESC';
 
         const [rows] = await pool.query(query, params);
