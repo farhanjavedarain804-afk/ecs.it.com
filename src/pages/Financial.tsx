@@ -268,7 +268,7 @@ const Financial = () => {
       {/* Summary cards overhaul */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
         <div className="rounded-xl border border-border bg-card p-4 shadow-card">
-          <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Current Balance</p>
+          <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Remaining Balance</p>
           <p className={`text-xl font-bold mt-1 ${summary.net_balance >= 0 ? "text-primary" : "text-destructive"}`}>Rs. {summary.net_balance.toLocaleString()}</p>
         </div>
         <div className="rounded-xl border border-border bg-card p-4 shadow-card">
