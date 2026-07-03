@@ -47,9 +47,9 @@ export function Footer() {
           <div>
             <h4 className="text-sm font-semibold uppercase tracking-wider text-white">Contact</h4>
             <ul className="mt-4 space-y-3 text-sm text-white/70">
-              <li className="flex gap-2"><Phone className="h-4 w-4 mt-0.5 shrink-0" /> +92 300 0000000</li>
-              <li className="flex gap-2"><Mail className="h-4 w-4 mt-0.5 shrink-0" /> info@ecs.com.pk</li>
-              <li className="flex gap-2"><MapPin className="h-4 w-4 mt-0.5 shrink-0" /> Head Office, Pakistan</li>
+              <li className="flex gap-2"><Phone className="h-4 w-4 mt-0.5 shrink-0" /> +92 310 1111 327</li>
+              <li className="flex gap-2"><Mail className="h-4 w-4 mt-0.5 shrink-0" /> ecs.isbpak@gmail.com</li>
+              <li className="flex gap-2"><MapPin className="h-4 w-4 mt-0.5 shrink-0" /> 1st Floor, Zain Plaza, Islamabad</li>
             </ul>
           </div>
         </div>

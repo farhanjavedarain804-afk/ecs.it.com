@@ -42,16 +42,24 @@ export function Contact() {
             call our 24/7 hotline.
           </p>
           <ul className="mt-8 space-y-4">
-            <ContactRow icon={Phone} label="Hotline" value="+92 300 0000000" />
-            <ContactRow icon={Mail} label="Email" value="info@ecs.com.pk" />
-            <ContactRow icon={MapPin} label="Head Office" value="Pakistan" />
+            <ContactRow icon={Phone} label="Hotline" value="+92 310 1111 327" />
+            <ContactRow icon={Mail} label="Email" value="ecs.isbpak@gmail.com" />
+            <ContactRow icon={MapPin} label="Head Office" value="1st Floor, Zain Plaza, Islamabad" />
+
           </ul>
         </div>
 
         <form onSubmit={onSubmit} className="lg:col-span-3 rounded-3xl bg-card border border-border shadow-card-soft p-6 sm:p-8 grid sm:grid-cols-2 gap-4">
           <Field label="Name"><Input name="name" required maxLength={100} placeholder="Your full name" /></Field>
           <Field label="Phone"><Input name="phone" required maxLength={20} placeholder="+92 ..." /></Field>
+          <Field label="City" className="sm:col-span-2">
+            <select name="city" required defaultValue="" className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm">
+              <option value="" disabled>Select your city/branch</option>
+              {["Fateh Jang", "B17", "Islamabad", "Bakhar"].map((city) => <option key={city} value={city}>{city}</option>)}
+            </select>
+          </Field>
           <Field label="Email" className="sm:col-span-2"><Input name="email" type="email" required maxLength={255} placeholder="you@example.com" /></Field>
+
           <Field label="Service Required" className="sm:col-span-2">
             <select name="service" required defaultValue="" className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm">
               <option value="" disabled>Select a service</option>
