@@ -4,6 +4,19 @@ const pool = require('../config/db');
 const auth = require('../middleware/auth');
 const crypto = require('crypto');
 
+// @route   GET /api/service_requests/public/branches
+// @desc    Get active branches for the contact form dropdown
+// @access  Public
+router.get('/public/branches', async (req, res) => {
+    try {
+        const [branches] = await pool.query('SELECT id, name, city FROM branches ORDER BY name ASC');
+        res.json(branches);
+    } catch (err) {
+        console.error('[Public Branches Error]:', err);
+        res.status(500).json({ error: 'Server error fetching branches' });
+    }
+});
+
 // @route   POST /api/service-requests/public
 // @desc    Submit a new service request from the public landing page
 // @access  Public
@@ -33,6 +46,9 @@ router.post('/public', async (req, res) => {
         if (!colNames.includes('service_required') && !colNames.includes('service')) {
             await pool.query("ALTER TABLE service_requests ADD COLUMN service_required VARCHAR(255) DEFAULT NULL");
         }
+        if (!colNames.includes('branch_id')) {
+            await pool.query("ALTER TABLE service_requests ADD COLUMN branch_id VARCHAR(36) DEFAULT NULL");
+        }
         if (!colNames.includes('city_branch') && !colNames.includes('branch') && !colNames.includes('city')) {
             await pool.query("ALTER TABLE service_requests ADD COLUMN city_branch VARCHAR(255) DEFAULT NULL");
         }
@@ -58,6 +74,15 @@ router.post('/public', async (req, res) => {
         
         if (dbBranchCol) {
             insertFields.push(dbBranchCol);
+            
+            // Note: from now on, city_branch in the body might actually be the branch UUID from the dynamic dropdown.
+            // But we should also store it in the branch_id column if it exists.
+            insertValues.push(city_branch.trim());
+        }
+        
+        if (colNames.includes('branch_id')) {
+            // We pass the UUID in the city_branch field from the frontend
+            insertFields.push('branch_id');
             insertValues.push(city_branch.trim());
         }
 
@@ -97,6 +122,9 @@ router.get('/', auth(), async (req, res) => {
         if (!colNames.includes('service_required') && !colNames.includes('service')) {
             await pool.query("ALTER TABLE service_requests ADD COLUMN service_required VARCHAR(255) DEFAULT NULL");
         }
+        if (!colNames.includes('branch_id')) {
+            await pool.query("ALTER TABLE service_requests ADD COLUMN branch_id VARCHAR(36) DEFAULT NULL");
+        }
         if (!colNames.includes('city_branch') && !colNames.includes('branch') && !colNames.includes('city')) {
             await pool.query("ALTER TABLE service_requests ADD COLUMN city_branch VARCHAR(255) DEFAULT NULL");
         }
@@ -107,15 +135,20 @@ router.get('/', auth(), async (req, res) => {
         const dbBranchCol = colNames.includes('city_branch') ? 'city_branch' : (colNames.includes('branch') ? 'branch' : (colNames.includes('city') ? 'city' : 'city_branch'));
 
         // If user is branch_admin or restricted, only show their branch
-        if (req.user.role !== 'developer' && req.user.role !== 'super_admin' && req.user.branch_id && dbBranchCol) {
-            // We need to match the city_branch string to their branch name/city
-            // To do this reliably, let's get the branch name from the database first
-            const [branch] = await pool.query('SELECT name, city FROM branches WHERE id = ?', [req.user.branch_id]);
-            if (branch.length > 0) {
-                const bName = branch[0].name;
-                const bCity = branch[0].city;
-                query += ` AND (${dbBranchCol} = ? OR ${dbBranchCol} = ?)`;
-                params.push(bName, bCity);
+        if (req.user.role !== 'developer' && req.user.role !== 'super_admin' && req.user.branch_id) {
+            if (colNames.includes('branch_id')) {
+                // Precise match by UUID (new way)
+                query += ` AND branch_id = ?`;
+                params.push(req.user.branch_id);
+            } else if (dbBranchCol) {
+                // Legacy fallback match by name/city (old way)
+                const [branch] = await pool.query('SELECT name, city FROM branches WHERE id = ?', [req.user.branch_id]);
+                if (branch.length > 0) {
+                    const bName = branch[0].name;
+                    const bCity = branch[0].city;
+                    query += ` AND (${dbBranchCol} = ? OR ${dbBranchCol} = ?)`;
+                    params.push(bName, bCity);
+                }
             }
         }
 

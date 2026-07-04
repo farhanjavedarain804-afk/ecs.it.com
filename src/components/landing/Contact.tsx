@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { z } from "zod";
 import { Send, Phone, Mail, MapPin, Loader2, CheckCircle2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -17,6 +17,23 @@ const schema = z.object({
 
 export function Contact() {
   const [state, setState] = useState<{ status: "idle" | "submitting" | "done" | "error"; error?: string; id?: string }>({ status: "idle" });
+  const [branches, setBranches] = useState<{id: string, name: string, city?: string}[]>([]);
+
+  useEffect(() => {
+    const fetchBranches = async () => {
+      try {
+        const API_URL = import.meta.env.VITE_API_URL || '';
+        const res = await fetch(`${API_URL}/api/service_requests/public/branches`);
+        if (res.ok) {
+          const data = await res.json();
+          setBranches(data);
+        }
+      } catch (err) {
+        console.error("Failed to load branches", err);
+      }
+    };
+    fetchBranches();
+  }, []);
 
   const onSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -74,10 +91,18 @@ export function Contact() {
         <form onSubmit={onSubmit} className="lg:col-span-3 rounded-3xl bg-card border border-border shadow-card-soft p-6 sm:p-8 grid sm:grid-cols-2 gap-4">
           <Field label="Name"><Input name="name" required maxLength={100} placeholder="Your full name" /></Field>
           <Field label="Phone"><Input name="phone" required maxLength={20} placeholder="+92 ..." /></Field>
-          <Field label="City" className="sm:col-span-2">
+          <Field label="City / Branch" className="sm:col-span-2">
             <select name="city" required defaultValue="" className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm">
-              <option value="" disabled>Select your city/branch</option>
-              {["Fateh Jang", "B17", "Islamabad", "Bakhar"].map((city) => <option key={city} value={city}>{city}</option>)}
+              <option value="" disabled>Select your nearest branch</option>
+              {branches.length > 0 ? (
+                branches.map((b) => (
+                  <option key={b.id} value={b.id}>
+                    {b.name} {b.city ? `(${b.city})` : ''}
+                  </option>
+                ))
+              ) : (
+                ["Fateh Jang", "B17", "Islamabad", "Bakhar"].map((city) => <option key={city} value={city}>{city}</option>)
+              )}
             </select>
           </Field>
           <Field label="Email" className="sm:col-span-2"><Input name="email" type="email" required maxLength={255} placeholder="you@example.com" /></Field>
