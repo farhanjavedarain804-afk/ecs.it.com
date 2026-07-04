@@ -160,98 +160,102 @@ const getDetailFields = (result: any) => {
 };
 
 const downloadVerificationPDF = (result: any, verifiedId: string) => {
-  const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
-  const pageW = doc.internal.pageSize.getWidth();
-  const margin = 20;
+  const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: [80, 250] }); // 80mm thermal receipt
+  const pageW = 80;
+  const margin = 4;
   let y = 0;
 
   // White background
   doc.setFillColor(255, 255, 255);
-  doc.rect(0, 0, pageW, 297, "F");
+  doc.rect(0, 0, pageW, 250, "F");
 
-  // Green header bar
-  doc.setFillColor(16, 185, 129);
-  doc.rect(0, 0, pageW, 48, "F");
+  y = 4;
 
-  // Add ECS Logo
+  // ECS Logo (Center it)
   try {
-    doc.addImage(ECS_LOGO_BASE64, "PNG", pageW - margin - 35, 9, 35, 30);
+    doc.addImage(ECS_LOGO_BASE64, "PNG", (pageW - 24) / 2, y, 24, 20);
   } catch (e) {
     console.warn("Failed to add logo to PDF", e);
   }
+  y += 24;
 
   // Header text
-  doc.setTextColor(255, 255, 255);
-  doc.setFontSize(20);
+  doc.setTextColor(15, 23, 42);
+  doc.setFontSize(12);
   doc.setFont("helvetica", "bold");
-  doc.text("ECS VERIFICATION REPORT", margin, 20);
-  doc.setFontSize(9);
+  doc.text("ECS VERIFICATION", pageW / 2, y, { align: "center" });
+  y += 5;
+
+  doc.setFontSize(7);
   doc.setFont("helvetica", "normal");
-  doc.text("Electric Complaint Solutions — Official Authenticity Record", margin, 28);
-  doc.text(`Verified ID: ${verifiedId}`, margin, 36);
-  doc.text(`Verification Date: ${format(new Date(), "dd MMMM yyyy, HH:mm")}`, margin, 43);
+  doc.text("Electric Complaint Solutions", pageW / 2, y, { align: "center" });
+  y += 4;
+  doc.text("Official Authenticity Record", pageW / 2, y, { align: "center" });
+  y += 6;
 
-  y = 60;
+  // Date
+  doc.setFontSize(7);
+  doc.text(`Date: ${format(new Date(), "dd MMM yyyy, HH:mm")}`, pageW / 2, y, { align: "center" });
+  y += 4;
+  doc.text(`ID: ${verifiedId}`, pageW / 2, y, { align: "center" });
+  y += 6;
 
-  // Verified badge box
-  doc.setFillColor(236, 253, 245);
-  doc.setDrawColor(16, 185, 129);
-  doc.roundedRect(margin, y, pageW - margin * 2, 16, 3, 3, "FD");
-  doc.setTextColor(5, 150, 105);
-  doc.setFontSize(10);
+  // Dashed line
+  doc.setDrawColor(0, 0, 0);
+  doc.setLineDash([1, 1], 0);
+  doc.line(margin, y, pageW - margin, y);
+  doc.setLineDash([], 0); // reset
+  y += 6;
+
+  // Verified Status (Stamp)
+  doc.setFontSize(9);
   doc.setFont("helvetica", "bold");
-  doc.text("✓  Digitally Verified by Electric Complaint Solutions (ECS)", margin + 4, y + 10.5);
-
-  // Add Verification Stamp
+  doc.text("RECORD VERIFIED", pageW / 2, y, { align: "center" });
+  y += 5;
   try {
-    // 25x25 stamp image aligned to the right inside the badge box
-    doc.addImage(ECS_STAMP_BASE64, "PNG", pageW - margin - 22, y - 4, 24, 24);
+    doc.addImage(ECS_STAMP_BASE64, "PNG", (pageW - 16) / 2, y, 16, 16);
   } catch (e) {
     console.warn("Failed to add stamp to PDF", e);
   }
+  y += 20;
 
-  y += 26;
-
-  // Record type heading
-  doc.setTextColor(30, 41, 59);
-  doc.setFontSize(13);
-  doc.setFont("helvetica", "bold");
-  doc.text(typeLabels[result.type] || "Document Record", margin, y);
-  y += 8;
-  doc.setDrawColor(220, 220, 220);
+  doc.setDrawColor(0, 0, 0);
+  doc.setLineDash([1, 1], 0);
   doc.line(margin, y, pageW - margin, y);
-  y += 8;
+  doc.setLineDash([], 0);
+  y += 6;
 
   // Detail fields
   const fields = getDetailFields(result);
-  doc.setFontSize(9);
+
+  doc.setFontSize(8);
   fields.forEach((field) => {
-    if (y > 260) { doc.addPage(); y = 20; }
+    // Label
     doc.setFont("helvetica", "bold");
-    doc.setTextColor(100, 116, 139);
     doc.text(field.label.toUpperCase(), margin, y);
+    y += 4;
+
+    // Value
     doc.setFont("helvetica", "normal");
-    doc.setTextColor(15, 23, 42);
     const val = String(field.value || "—");
-    const lines = doc.splitTextToSize(val, pageW - margin * 2 - 50);
-    doc.text(lines, pageW - margin, y, { align: "right" });
-    y += 8;
-    doc.setDrawColor(241, 245, 249);
-    doc.line(margin, y - 1, pageW - margin, y - 1);
+    const lines = doc.splitTextToSize(val, pageW - margin * 2);
+    doc.text(lines, margin, y);
+    y += (lines.length * 4) + 2;
   });
 
-  y += 10;
+  y += 4;
+  doc.setLineDash([1, 1], 0);
+  doc.line(margin, y, pageW - margin, y);
+  doc.setLineDash([], 0);
+  y += 6;
 
   // Footer
-  if (y > 250) { doc.addPage(); y = 20; }
-  doc.setFillColor(248, 250, 252);
-  doc.rect(margin, y, pageW - margin * 2, 30, "F");
-  doc.setFontSize(8);
-  doc.setFont("helvetica", "normal");
-  doc.setTextColor(100, 116, 139);
-  doc.text("This document is an official verification certificate issued by Electric Complaint Solutions.", margin + 4, y + 8);
-  doc.text("Any tampering or alteration of this document is illegal and punishable by law.", margin + 4, y + 14);
-  doc.text("Developed By Devionic (Private) Limited | +92-317-7121841 Whatsapp | www.devionic.com | info@devionic.com", margin + 4, y + 26);
+  doc.setFontSize(6);
+  doc.text("Digitally Verified by ECS", pageW / 2, y, { align: "center" });
+  y += 4;
+  doc.text("Devionic (Pvt) Ltd | +92-317-7121841", pageW / 2, y, { align: "center" });
+  y += 4;
+  doc.text("www.devionic.com", pageW / 2, y, { align: "center" });
 
   doc.save(`ECS-Verification-${verifiedId}-${Date.now()}.pdf`);
 };
@@ -417,79 +421,96 @@ const PublicVerify = () => {
                 </div>
               </div>
 
-              <AnimatePresence mode="wait">
-                {!showDetail ? (
-                  <motion.div key="summary" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
-                    {/* Summary Card */}
-                    <div className="p-8 grid grid-cols-2 sm:grid-cols-4 gap-6 border-b border-slate-100">
-                      {getSummaryFields(result).map((f, i) => (
-                        <div key={i} className="flex flex-col gap-2">
-                          <div className="flex items-center gap-2 text-slate-400">
-                            {f.icon}
-                            <span className="text-[10px] font-bold uppercase tracking-wider">{f.label}</span>
-                          </div>
-                          {(f as any).isStatus
-                            ? <StatusBadge value={f.value} />
-                            : <span className="text-base font-bold text-slate-800 truncate">{f.value || "—"}</span>
-                          }
-                        </div>
-                      ))}
-                    </div>
-
-                    <div className="p-10 flex flex-col items-center justify-center bg-slate-50/50">
-                      <button
-                        onClick={() => setShowDetail(true)}
-                        className="group relative inline-flex items-center justify-center gap-2 px-8 py-4 bg-slate-900 text-white rounded-2xl font-bold uppercase tracking-wider overflow-hidden hover:scale-105 transition-all shadow-lg hover:shadow-slate-900/20"
-                      >
-                        <div className="absolute inset-0 bg-gradient-to-r from-emerald-500 to-teal-500 opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
-                        <span className="relative z-10">View Detailed Report</span>
-                        <ChevronDown className="w-5 h-5 relative z-10 group-hover:translate-y-1 transition-transform" />
-                      </button>
-                    </div>
-                  </motion.div>
-                ) : (
-                  <motion.div key="detail" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} className="p-8 bg-slate-50/50">
-                    <div className="flex items-center justify-between mb-8">
-                      <h4 className="text-lg font-black text-slate-900 tracking-tight">Complete Record Details</h4>
-                      <button
-                        onClick={() => setShowDetail(false)}
-                        className="text-sm font-bold text-slate-400 hover:text-slate-700 flex items-center gap-1 transition-colors"
-                      >
-                        <ArrowLeft className="w-4 h-4" /> Back to Summary
-                      </button>
-                    </div>
-                    
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
-                      {getDetailFields(result).map((field, i) => (
-                        <div
-                          key={i}
-                          className="group relative rounded-2xl bg-white border border-slate-100 p-6 shadow-sm hover:shadow-xl hover:shadow-emerald-500/10 hover:-translate-y-1 transition-all duration-300 overflow-hidden flex flex-col gap-2"
-                        >
-                          <div className="absolute -top-10 -right-10 h-28 w-28 rounded-full bg-gradient-to-br from-emerald-400 to-teal-500 opacity-0 group-hover:opacity-10 transition-opacity duration-300" />
-                          <span className="text-[10px] font-bold uppercase tracking-widest text-slate-400 relative z-10">{field.label}</span>
-                          <div className="relative z-10 mt-1">
-                            {(field as any).isStatus
-                              ? <StatusBadge value={field.value} />
-                              : <span className="text-base font-bold text-slate-800 leading-tight">{field.value || "—"}</span>
+              <div style={{ perspective: 1200 }}>
+                <AnimatePresence mode="wait">
+                  {!showDetail ? (
+                    <motion.div
+                      key="summary"
+                      initial={{ rotateY: -90, opacity: 0 }}
+                      animate={{ rotateY: 0, opacity: 1 }}
+                      exit={{ rotateY: 90, opacity: 0 }}
+                      transition={{ duration: 0.3 }}
+                      style={{ transformStyle: "preserve-3d" }}
+                    >
+                      {/* Summary Card */}
+                      <div className="p-8 grid grid-cols-2 sm:grid-cols-4 gap-6 border-b border-slate-100">
+                        {getSummaryFields(result).map((f, i) => (
+                          <div key={i} className="flex flex-col gap-2">
+                            <div className="flex items-center gap-2 text-slate-400">
+                              {f.icon}
+                              <span className="text-[10px] font-bold uppercase tracking-wider">{f.label}</span>
+                            </div>
+                            {(f as any).isStatus
+                              ? <StatusBadge value={f.value} />
+                              : <span className="text-base font-bold text-slate-800 truncate">{f.value || "—"}</span>
                             }
                           </div>
-                        </div>
-                      ))}
-                    </div>
+                        ))}
+                      </div>
 
-                    <div className="mt-10 flex flex-col sm:flex-row gap-4">
-                      <button
-                        onClick={() => downloadVerificationPDF(result, verifiedId)}
-                        className="flex-1 group relative inline-flex items-center justify-center gap-2 px-8 py-5 bg-gradient-to-r from-emerald-500 to-teal-600 text-white rounded-2xl font-black text-sm uppercase tracking-widest overflow-hidden hover:scale-[1.02] transition-all shadow-xl shadow-emerald-500/20"
-                      >
-                        <div className="absolute inset-0 bg-white/20 translate-y-full group-hover:translate-y-0 transition-transform duration-300" />
-                        <Download className="w-5 h-5 relative z-10 group-hover:-translate-y-1 transition-transform" />
-                        <span className="relative z-10">Download PDF Verification Report</span>
-                      </button>
-                    </div>
-                  </motion.div>
-                )}
-              </AnimatePresence>
+                      <div className="p-10 flex flex-col items-center justify-center bg-slate-50/50">
+                        <button
+                          onClick={() => setShowDetail(true)}
+                          className="group relative inline-flex items-center justify-center gap-2 px-8 py-4 bg-slate-900 text-white rounded-2xl font-bold uppercase tracking-wider overflow-hidden hover:scale-105 transition-all shadow-lg hover:shadow-slate-900/20"
+                        >
+                          <div className="absolute inset-0 bg-gradient-to-r from-emerald-500 to-teal-500 opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+                          <span className="relative z-10">View Detailed Report</span>
+                          <ChevronDown className="w-5 h-5 relative z-10 group-hover:translate-y-1 transition-transform" />
+                        </button>
+                      </div>
+                    </motion.div>
+                  ) : (
+                    <motion.div
+                      key="detail"
+                      initial={{ rotateY: -90, opacity: 0 }}
+                      animate={{ rotateY: 0, opacity: 1 }}
+                      exit={{ rotateY: 90, opacity: 0 }}
+                      transition={{ duration: 0.3 }}
+                      style={{ transformStyle: "preserve-3d" }}
+                      className="p-8 bg-slate-50/50"
+                    >
+                      <div className="flex items-center justify-between mb-8">
+                        <h4 className="text-lg font-black text-slate-900 tracking-tight">Complete Record Details</h4>
+                        <button
+                          onClick={() => setShowDetail(false)}
+                          className="text-sm font-bold text-slate-400 hover:text-slate-700 flex items-center gap-1 transition-colors"
+                        >
+                          <ArrowLeft className="w-4 h-4" /> Back to Summary
+                        </button>
+                      </div>
+                      
+                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+                        {getDetailFields(result).map((field, i) => (
+                          <div
+                            key={i}
+                            className="group relative rounded-2xl bg-white border border-slate-100 p-6 shadow-sm hover:shadow-xl hover:shadow-emerald-500/10 hover:-translate-y-1 transition-all duration-300 overflow-hidden flex flex-col gap-2"
+                          >
+                            <div className="absolute -top-10 -right-10 h-28 w-28 rounded-full bg-gradient-to-br from-emerald-400 to-teal-500 opacity-0 group-hover:opacity-10 transition-opacity duration-300" />
+                            <span className="text-[10px] font-bold uppercase tracking-widest text-slate-400 relative z-10">{field.label}</span>
+                            <div className="relative z-10 mt-1">
+                              {(field as any).isStatus
+                                ? <StatusBadge value={field.value} />
+                                : <span className="text-base font-bold text-slate-800 leading-tight">{field.value || "—"}</span>
+                              }
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+
+                      <div className="mt-10 flex flex-col sm:flex-row gap-4">
+                        <button
+                          onClick={() => downloadVerificationPDF(result, verifiedId)}
+                          className="flex-1 group relative inline-flex items-center justify-center gap-2 px-8 py-5 bg-gradient-to-r from-emerald-500 to-teal-600 text-white rounded-2xl font-black text-sm uppercase tracking-widest overflow-hidden hover:scale-[1.02] transition-all shadow-xl shadow-emerald-500/20"
+                        >
+                          <div className="absolute inset-0 bg-white/20 translate-y-full group-hover:translate-y-0 transition-transform duration-300" />
+                          <Download className="w-5 h-5 relative z-10 group-hover:-translate-y-1 transition-transform" />
+                          <span className="relative z-10">Download Thermal PDF Report</span>
+                        </button>
+                      </div>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+              </div>
 
               {/* Footer stamp */}
               <div className="m-6 p-5 rounded-2xl bg-emerald-50 border border-emerald-100 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
