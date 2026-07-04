@@ -3,7 +3,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { useSearchParams, useNavigate, Link } from "react-router-dom";
 import {
   ShieldCheck, Search, ScanLine, FileText, ClipboardList,
-  User, Building2, BadgeCheck, AlertCircle, ArrowLeft,
+  User, Building2, BadgeCheck, AlertCircle, ArrowLeft, X,
   Globe, Phone, CheckCircle2, Download, ChevronDown, ChevronUp,
   CreditCard, Calendar, MapPin, Hash, Banknote, Tag
 } from "lucide-react";
@@ -160,102 +160,163 @@ const getDetailFields = (result: any) => {
 };
 
 const downloadVerificationPDF = (result: any, verifiedId: string) => {
-  const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: [80, 250] }); // 80mm thermal receipt
+  const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: [80, 260] });
   const pageW = 80;
-  const margin = 4;
+  const margin = 5;
   let y = 0;
 
-  // White background
+  // ── White background ─────────────────────────────────────────
   doc.setFillColor(255, 255, 255);
-  doc.rect(0, 0, pageW, 250, "F");
+  doc.rect(0, 0, pageW, 260, "F");
 
-  y = 4;
+  // ── TOP green header bar ──────────────────────────────────────
+  doc.setFillColor(16, 185, 129); // emerald-500
+  doc.rect(0, 0, pageW, 20, "F");
 
-  // ECS Logo (Center it)
+  // ── ECS Logo centered on the green bar ───────────────────────
   try {
-    doc.addImage(ECS_LOGO_BASE64, "PNG", (pageW - 24) / 2, y, 24, 20);
+    // white circle bg behind logo so it pops on green
+    doc.setFillColor(255, 255, 255);
+    doc.circle(pageW / 2, 10, 9, "F");
+    doc.addImage(ECS_LOGO_BASE64, "PNG", (pageW - 14) / 2, 3, 14, 14);
   } catch (e) {
-    console.warn("Failed to add logo to PDF", e);
+    // fallback: just text
+    doc.setTextColor(255, 255, 255);
+    doc.setFontSize(10);
+    doc.setFont("helvetica", "bold");
+    doc.text("ECS", pageW / 2, 12, { align: "center" });
   }
-  y += 24;
+  y = 24;
 
-  // Header text
+  // ── Title ─────────────────────────────────────────────────────
   doc.setTextColor(15, 23, 42);
-  doc.setFontSize(12);
+  doc.setFontSize(11);
   doc.setFont("helvetica", "bold");
-  doc.text("ECS VERIFICATION", pageW / 2, y, { align: "center" });
+  doc.text("ECS VERIFICATION SLIP", pageW / 2, y, { align: "center" });
   y += 5;
 
   doc.setFontSize(7);
   doc.setFont("helvetica", "normal");
-  doc.text("Electric Complaint Solutions", pageW / 2, y, { align: "center" });
+  doc.setTextColor(71, 85, 105);
+  doc.text("Electric Complaint Solutions — Official Document", pageW / 2, y, { align: "center" });
   y += 4;
-  doc.text("Official Authenticity Record", pageW / 2, y, { align: "center" });
-  y += 6;
-
-  // Date
-  doc.setFontSize(7);
-  doc.text(`Date: ${format(new Date(), "dd MMM yyyy, HH:mm")}`, pageW / 2, y, { align: "center" });
+  doc.text(`Issued: ${format(new Date(), "dd MMM yyyy, HH:mm")}`, pageW / 2, y, { align: "center" });
   y += 4;
-  doc.text(`ID: ${verifiedId}`, pageW / 2, y, { align: "center" });
-  y += 6;
-
-  // Dashed line
-  doc.setDrawColor(0, 0, 0);
-  doc.setLineDash([1, 1], 0);
-  doc.line(margin, y, pageW - margin, y);
-  doc.setLineDash([], 0); // reset
-  y += 6;
-
-  // Verified Status (Stamp)
-  doc.setFontSize(9);
-  doc.setFont("helvetica", "bold");
-  doc.text("RECORD VERIFIED", pageW / 2, y, { align: "center" });
+  doc.text(`Ref ID: ${verifiedId}`, pageW / 2, y, { align: "center" });
   y += 5;
-  try {
-    doc.addImage(ECS_STAMP_BASE64, "PNG", (pageW - 16) / 2, y, 16, 16);
-  } catch (e) {
-    console.warn("Failed to add stamp to PDF", e);
-  }
-  y += 20;
 
-  doc.setDrawColor(0, 0, 0);
-  doc.setLineDash([1, 1], 0);
+  // ── Dashed divider ────────────────────────────────────────────
+  doc.setDrawColor(200, 200, 200);
+  doc.setLineDash([1.5, 1.5], 0);
   doc.line(margin, y, pageW - margin, y);
   doc.setLineDash([], 0);
-  y += 6;
+  y += 5;
 
-  // Detail fields
-  const fields = getDetailFields(result);
+  // ── RECORD VERIFIED label ─────────────────────────────────────
+  doc.setFontSize(10);
+  doc.setFont("helvetica", "bold");
+  doc.setTextColor(16, 185, 129); // emerald
+  doc.text("✔  RECORD VERIFIED", pageW / 2, y, { align: "center" });
+  y += 5;
 
+  // ── Green Verified STAMP image ────────────────────────────────
+  try {
+    const stampW = 30;
+    const stampH = 30;
+    doc.addImage(ECS_STAMP_BASE64, "PNG", (pageW - stampW) / 2, y, stampW, stampH);
+    y += stampH + 3;
+  } catch (e) {
+    // Fallback drawn stamp
+    doc.setDrawColor(16, 185, 129);
+    doc.setLineWidth(1.2);
+    doc.circle(pageW / 2, y + 10, 10);
+    doc.setFontSize(7);
+    doc.setFont("helvetica", "bold");
+    doc.setTextColor(16, 185, 129);
+    doc.text("VERIFIED", pageW / 2, y + 9, { align: "center" });
+    doc.text("ECS", pageW / 2, y + 13, { align: "center" });
+    doc.setLineWidth(0.2);
+    y += 23;
+  }
+
+  // ── Second dashed divider ─────────────────────────────────────
+  doc.setDrawColor(200, 200, 200);
+  doc.setLineDash([1.5, 1.5], 0);
+  doc.line(margin, y, pageW - margin, y);
+  doc.setLineDash([], 0);
+  y += 5;
+
+  // ── Record Details ────────────────────────────────────────────
+  doc.setTextColor(15, 23, 42);
   doc.setFontSize(8);
+  doc.setFont("helvetica", "bold");
+  doc.text("RECORD DETAILS", pageW / 2, y, { align: "center" });
+  y += 4;
+
+  const fields = getDetailFields(result);
   fields.forEach((field) => {
     // Label
+    doc.setFontSize(6.5);
     doc.setFont("helvetica", "bold");
+    doc.setTextColor(100, 116, 139); // slate-500
     doc.text(field.label.toUpperCase(), margin, y);
-    y += 4;
+    y += 3.5;
 
     // Value
     doc.setFont("helvetica", "normal");
+    doc.setTextColor(15, 23, 42);
     const val = String(field.value || "—");
     const lines = doc.splitTextToSize(val, pageW - margin * 2);
     doc.text(lines, margin, y);
-    y += (lines.length * 4) + 2;
+    y += (lines.length * 3.8) + 1.5;
+
+    // subtle line between fields
+    doc.setDrawColor(230, 230, 230);
+    doc.setLineWidth(0.1);
+    doc.line(margin, y, pageW - margin, y);
+    doc.setLineWidth(0.2);
+    y += 2;
   });
 
-  y += 4;
-  doc.setLineDash([1, 1], 0);
+  y += 3;
+
+  // ── Bottom dashed divider ─────────────────────────────────────
+  doc.setDrawColor(180, 180, 180);
+  doc.setLineDash([1.5, 1.5], 0);
   doc.line(margin, y, pageW - margin, y);
   doc.setLineDash([], 0);
-  y += 6;
+  y += 5;
 
-  // Footer
-  doc.setFontSize(6);
-  doc.text("Digitally Verified by ECS", pageW / 2, y, { align: "center" });
-  y += 4;
-  doc.text("Devionic (Pvt) Ltd | +92-317-7121841", pageW / 2, y, { align: "center" });
-  y += 4;
-  doc.text("www.devionic.com", pageW / 2, y, { align: "center" });
+  // ── Footer ────────────────────────────────────────────────────
+  doc.setFillColor(16, 185, 129);
+  doc.rect(0, y - 2, pageW, 0.5, "F"); // thin green top border on footer
+
+  doc.setTextColor(15, 23, 42);
+  doc.setFontSize(6.5);
+  doc.setFont("helvetica", "bold");
+  doc.text("Electric Complaint Solutions (ECS)", pageW / 2, y + 2, { align: "center" });
+  y += 5.5;
+
+  doc.setFont("helvetica", "normal");
+  doc.setTextColor(71, 85, 105);
+  const footerLines = [
+    "📍 1st Floor, Zain Plaza, Islamabad",
+    "📞 +92 310 1111 327",
+    "✉  ecs.isbpak@gmail.com",
+    "🌐 www.ecs.it.com",
+    "────────────────────",
+    "Digitally Verified by Electric Complaint Solutions (ECS)",
+    "────────────────────",
+    "Developed By Devionic (Private) Limited",
+    "WhatsApp: +92-317-7121841",
+    "www.devionic.com | info@devionic.com",
+  ];
+  footerLines.forEach((line) => {
+    doc.setFontSize(line.startsWith("──") ? 5.5 : 6);
+    const wrapped = doc.splitTextToSize(line, pageW - margin * 2);
+    doc.text(wrapped, pageW / 2, y, { align: "center" });
+    y += (wrapped.length * 3.5) + 0.5;
+  });
 
   doc.save(`ECS-Verification-${verifiedId}-${Date.now()}.pdf`);
 };
@@ -267,11 +328,12 @@ const StatusBadge = ({ value }: { value: string }) => (
   </span>
 );
 
-const PublicVerify = () => {
+const PublicVerify = ({ onClose, overrideId }: { onClose?: () => void, overrideId?: string }) => {
   const [searchParams] = useSearchParams();
   const { id: pathId } = useParams();
   const navigate = useNavigate();
-  const [input, setInput] = useState(pathId || searchParams.get("id") || "");
+  const initialId = overrideId || pathId || searchParams.get("id") || "";
+  const [input, setInput] = useState(initialId);
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<any>(null);
   const [error, setError] = useState<string | null>(null);
@@ -301,12 +363,12 @@ const PublicVerify = () => {
   };
 
   useEffect(() => {
-    const id = pathId || searchParams.get("id");
+    const id = overrideId || pathId || searchParams.get("id");
     if (id) {
       setInput(id);
       performVerification(id);
     }
-  }, [pathId, searchParams]);
+  }, [overrideId, pathId, searchParams]);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -318,29 +380,30 @@ const PublicVerify = () => {
   const verifiedId = pathId || searchParams.get("id") || input;
 
   return (
-    <div className="min-h-screen bg-[#FDFDFF] text-slate-800 font-sans">
-      <div className="fixed inset-0 pointer-events-none overflow-hidden">
-        <div className="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] bg-primary/5 rounded-full blur-[100px]" />
-        <div className="absolute bottom-[-5%] right-[-5%] w-[30%] h-[30%] bg-emerald-400/5 rounded-full blur-[80px]" />
-        <div className="absolute inset-0 opacity-[0.015]" style={{ backgroundImage: `radial-gradient(#1e40af 1px, transparent 1px)`, backgroundSize: '40px 40px' }} />
-      </div>
-
-      <div className="relative z-10 max-w-4xl mx-auto px-4 sm:px-6 pt-10 pb-24">
-        {/* Header */}
-        <div className="flex items-center justify-between mb-10 gap-4">
-          <Link to="/login" className="flex items-center gap-3 group">
-            <div className="w-12 h-12 bg-white rounded-2xl shadow-md border border-slate-100 flex items-center justify-center transition-transform group-hover:scale-110">
-              <img src={logo} alt="ECS Logo" className="h-7 w-auto" />
-            </div>
-            <div>
-              <h1 className="text-xl font-black text-slate-900 tracking-tight">ECS <span className="text-primary">Verify</span></h1>
-              <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-slate-400">Authenticity Guaranteed</p>
-            </div>
-          </Link>
-          <Link to="/login" className="flex items-center gap-2 text-sm font-bold text-slate-500 hover:text-primary transition-colors">
-            <ArrowLeft className="w-4 h-4" /> Back to Portal
-          </Link>
+    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm font-sans">
+      <div className="relative w-full max-w-5xl max-h-[95vh] overflow-y-auto bg-[#FDFDFF] rounded-[2.5rem] shadow-2xl">
+        <div className="absolute inset-0 pointer-events-none overflow-hidden rounded-[2.5rem]">
+          <div className="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] bg-primary/5 rounded-full blur-[100px]" />
+          <div className="absolute bottom-[-5%] right-[-5%] w-[30%] h-[30%] bg-emerald-400/5 rounded-full blur-[80px]" />
+          <div className="absolute inset-0 opacity-[0.015]" style={{ backgroundImage: `radial-gradient(#1e40af 1px, transparent 1px)`, backgroundSize: '40px 40px' }} />
         </div>
+
+        <div className="relative z-10 p-6 sm:p-10">
+          {/* Header */}
+          <div className="flex items-center justify-between mb-10 gap-4">
+            <Link to="/" onClick={(e) => { e.preventDefault(); if (onClose) onClose(); else navigate('/'); }} className="flex items-center gap-3 group">
+              <div className="w-12 h-12 bg-white rounded-2xl shadow-md border border-slate-100 flex items-center justify-center transition-transform group-hover:scale-110">
+                <img src={logo} alt="ECS Logo" className="h-7 w-auto" />
+              </div>
+              <div>
+                <h1 className="text-xl font-black text-slate-900 tracking-tight">ECS <span className="text-primary">Verify</span></h1>
+                <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-slate-400">Authenticity Guaranteed</p>
+              </div>
+            </Link>
+            <button onClick={() => { if (onClose) onClose(); else navigate('/'); }} className="p-3 bg-slate-100 hover:bg-slate-200 rounded-full transition-colors">
+              <X className="w-5 h-5 text-slate-500" />
+            </button>
+          </div>
 
         {/* Hero */}
         {!result && (
@@ -570,16 +633,7 @@ const PublicVerify = () => {
           )}
         </AnimatePresence>
       </div>
-
-      {/* Footer */}
-      <footer className="relative mt-auto py-10 px-6 border-t border-slate-100 bg-white">
-        <div className="max-w-4xl mx-auto flex flex-col items-center gap-4">
-          <h3 className="text-base font-black text-slate-900 tracking-tight">Electric Complaint Solutions</h3>
-          <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest text-center max-w-xl leading-relaxed">
-            Developed By Devionic (Private) Limited | +92-317-7121841 Whatsapp | www.devionic.com | info@devionic.com
-          </p>
-        </div>
-      </footer>
+    </div>
     </div>
   );
 };

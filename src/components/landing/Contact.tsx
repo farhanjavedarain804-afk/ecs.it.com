@@ -40,10 +40,13 @@ export function Contact() {
           city_branch: parsed.data.city,
         }),
       });
-      if (!res.ok) throw new Error("Failed to submit");
+      if (!res.ok) {
+        const errData = await res.json().catch(() => null);
+        throw new Error(errData?.error || "Failed to submit request");
+      }
       setState({ status: "done" });
     } catch (err: any) {
-      setState({ status: "error", error: "Connection error. Please try again later." });
+      setState({ status: "error", error: err.message || "Connection error. Please try again later." });
     }
   };
 

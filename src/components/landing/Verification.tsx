@@ -8,6 +8,9 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { format } from "date-fns";
+import { useSearchParams, useParams, useLocation } from "react-router-dom";
+import { useEffect } from "react";
+import PublicVerify from "@/pages/PublicVerify";
 
 const statusColors: Record<string, string> = {
   paid: "text-emerald-600",
@@ -97,6 +100,16 @@ export function Verification() {
   const [result, setResult] = useState<any>(null);
   const [error, setError] = useState<string | null>(null);
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const { id: pathId } = useParams();
+  const location = useLocation();
+
+  const [modalId, setModalId] = useState("");
+  
+  const isVerifyRoute = location.pathname.startsWith('/verify');
+  const urlVerifyId = pathId || searchParams.get("id");
+  const showModal = isVerifyRoute || !!modalId;
+  const activeVerifyId = urlVerifyId || modalId;
 
   const onVerify = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -212,7 +225,7 @@ export function Verification() {
                       variant="hero"
                       size="sm"
                       className="w-full gap-2"
-                      onClick={() => navigate(`/verify?id=${id.trim().toUpperCase()}`)}
+                      onClick={() => setModalId(id.trim().toUpperCase())}
                     >
                       <ExternalLink className="h-4 w-4" />
                       View Detailed Report & Download PDF
@@ -244,6 +257,18 @@ export function Verification() {
           </form>
         </div>
       </div>
+      
+      {showModal && (
+        <PublicVerify 
+          overrideId={activeVerifyId || ""} 
+          onClose={() => {
+            setModalId("");
+            if (isVerifyRoute) {
+              navigate('/');
+            }
+          }} 
+        />
+      )}
     </section>
   );
 }

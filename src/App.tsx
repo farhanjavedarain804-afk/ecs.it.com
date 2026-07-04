@@ -61,8 +61,8 @@ const App = () => (
 
             {/* Auth */}
             <Route path="/login" element={<Login />} />
-            <Route path="/verify" element={<PublicVerify />} />
-            <Route path="/verify/:id" element={<PublicVerify />} />
+            <Route path="/verify" element={<Home />} />
+            <Route path="/verify/:id" element={<Home />} />
 
             {/* Dashboard */}
             <Route path="/dashboard" element={<DashboardPage><Dashboard /></DashboardPage>} />
