@@ -26,16 +26,32 @@ router.post('/public', async (req, res) => {
         const colNames = columns.map(c => c.Field);
 
         const dbServiceCol = colNames.includes('service_required') ? 'service_required' : (colNames.includes('service') ? 'service' : null);
-        const dbBranchCol = colNames.includes('city_branch') ? 'city_branch' : (colNames.includes('branch') ? 'branch' : null);
+        const dbBranchCol = colNames.includes('city_branch') ? 'city_branch' : (colNames.includes('branch') ? 'branch' : (colNames.includes('city') ? 'city' : null));
         
-        if (!dbServiceCol) throw new Error("Database missing service column");
-        if (!dbBranchCol) throw new Error("Database missing branch column");
+        const insertFields = ['id', 'name', 'phone', 'status'];
+        const insertValues = [id, name.trim(), phone.trim(), 'pending'];
+        
+        if (colNames.includes('email')) {
+            insertFields.push('email');
+            insertValues.push(email?.trim() || null);
+        }
+        
+        if (dbServiceCol) {
+            insertFields.push(dbServiceCol);
+            insertValues.push(service_required.trim());
+        }
+        
+        if (dbBranchCol) {
+            insertFields.push(dbBranchCol);
+            insertValues.push(city_branch.trim());
+        }
+
+        const placeholders = insertFields.map(() => '?').join(', ');
 
         await pool.query(`
-            INSERT INTO service_requests 
-            (id, name, phone, email, ${dbServiceCol}, ${dbBranchCol}, status)
-            VALUES (?, ?, ?, ?, ?, ?, 'pending')
-        `, [id, name.trim(), phone.trim(), email?.trim() || null, service_required.trim(), city_branch.trim()]);
+            INSERT INTO service_requests (${insertFields.join(', ')})
+            VALUES (${placeholders})
+        `, insertValues);
 
         res.status(201).json({ success: true, message: 'Service request submitted successfully' });
     } catch (err) {
