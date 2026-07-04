@@ -44,6 +44,21 @@ const typeIcons: Record<string, React.ReactNode> = {
   salary_slip: <CreditCard className="w-7 h-7 text-indigo-600" />,
 };
 
+const maskPhone = (val?: string) => val ? val.replace(/.(?=.{4})/g, '*') : '—';
+const maskCNIC = (val?: string) => {
+  if (!val) return '—';
+  const parts = val.split('-');
+  if (parts.length === 3) return `${parts[0]}-*******-${parts[2]}`;
+  return val.substring(0, 4) + '*******' + val.substring(val.length - 2);
+};
+const maskAmount = (val?: string | number) => val ? 'Rs. ***,***' : '—';
+const maskEmail = (val?: string) => {
+  if (!val) return '—';
+  const [name, domain] = val.split('@');
+  if (!domain) return val.replace(/.(?=.{4})/g, '*');
+  return `${name.substring(0, 2)}${'*'.repeat(Math.max(1, name.length - 2))}@${domain}`;
+};
+
 const getSummaryFields = (result: any) => {
   const d = result.data;
   switch (result.type) {
@@ -72,14 +87,14 @@ const getSummaryFields = (result: any) => {
       return [
         { icon: <Building2 className="w-4 h-4" />, label: "Branch Name", value: d.name },
         { icon: <MapPin className="w-4 h-4" />, label: "City", value: d.city },
-        { icon: <Phone className="w-4 h-4" />, label: "Phone", value: d.phone },
+        { icon: <Phone className="w-4 h-4" />, label: "Phone", value: maskPhone(d.phone) },
         { icon: <Tag className="w-4 h-4" />, label: "Status", value: d.status, isStatus: true },
       ];
     case "salary_slip":
       return [
         { icon: <User className="w-4 h-4" />, label: "Employee", value: d.staff },
         { icon: <Hash className="w-4 h-4" />, label: "Employee ID", value: d.employee_id },
-        { icon: <Banknote className="w-4 h-4" />, label: "Net Salary", value: `Rs. ${Number(d.amount).toLocaleString()}` },
+        { icon: <Banknote className="w-4 h-4" />, label: "Net Salary", value: maskAmount(d.amount) },
         { icon: <Tag className="w-4 h-4" />, label: "Status", value: d.status, isStatus: true },
       ];
     default:
@@ -98,9 +113,11 @@ const getDetailFields = (result: any) => {
         { label: "Client Name", value: d.customer },
         { label: "Total Amount", value: `Rs. ${Number(d.amount).toLocaleString()}` },
         { label: "Payment Status", value: d.status, isStatus: true },
-        { label: "Issue Date", value: d.date ? fmt(d.date) : "â€”" },
+        { label: "Issue Date", value: d.date ? fmt(d.date) : "—" },
         { label: "Branch", value: d.branch || "Head Office" },
-        { label: "Location / City", value: d.city || "â€”" },
+        { label: "Location / City", value: d.city || "—" },
+        ...(d.email ? [{ label: "Client Email", value: maskEmail(d.email) }] : []),
+        ...(d.phone ? [{ label: "Client Phone", value: maskPhone(d.phone) }] : []),
         { label: "Organization", value: "Electric Complaint Solutions (ECS)" },
         { label: "Authenticated By", value: authLabel },
       ];
@@ -109,10 +126,12 @@ const getDetailFields = (result: any) => {
         { label: "Complaint Number", value: d.number },
         { label: "Complainant", value: d.customer },
         { label: "Status", value: d.status, isStatus: true },
-        { label: "Registration Date", value: d.date ? fmt(d.date) : "â€”" },
+        { label: "Registration Date", value: d.date ? fmt(d.date) : "—" },
         { label: "Handling Branch", value: d.branch },
-        { label: "Location / City", value: d.city || "â€”" },
-        { label: "Case Description", value: d.description || "â€”" },
+        { label: "Location / City", value: d.city || "—" },
+        ...(d.email ? [{ label: "Complainant Email", value: maskEmail(d.email) }] : []),
+        ...(d.phone ? [{ label: "Complainant Phone", value: maskPhone(d.phone) }] : []),
+        { label: "Case Description", value: d.description || "—" },
         { label: "Organization", value: "Electric Complaint Solutions (ECS)" },
       ];
     case "staff":
@@ -121,10 +140,11 @@ const getDetailFields = (result: any) => {
         { label: "Employee ID", value: d.number },
         { label: "Designation", value: d.designation },
         { label: "Employment Status", value: d.status, isStatus: true },
-        { label: "Joining Date", value: d.date ? fmt(d.date) : "â€”" },
+        { label: "Joining Date", value: d.date ? fmt(d.date) : "—" },
         { label: "Assigned Branch", value: d.branch },
-        { label: "CNIC (Partial)", value: d.cnic || "â€”" },
-        { label: "Contact Number", value: d.phone || "â€”" },
+        { label: "CNIC", value: maskCNIC(d.cnic) },
+        { label: "Contact Number", value: maskPhone(d.phone) },
+        ...(d.email ? [{ label: "Email Address", value: maskEmail(d.email) }] : []),
         { label: "Organization", value: "Electric Complaint Solutions (ECS)" },
         { label: "Authenticated By", value: authLabel },
       ];
@@ -134,7 +154,8 @@ const getDetailFields = (result: any) => {
         { label: "Branch Code", value: d.number },
         { label: "Status", value: d.status, isStatus: true },
         { label: "Primary City", value: d.city },
-        { label: "Contact Phone", value: d.phone },
+        { label: "Contact Phone", value: maskPhone(d.phone) },
+        ...(d.email ? [{ label: "Branch Email", value: maskEmail(d.email) }] : []),
         { label: "Official Address", value: d.address },
         { label: "Organization", value: "Electric Complaint Solutions (ECS)" },
         { label: "Authenticated By", value: authLabel },
@@ -146,11 +167,11 @@ const getDetailFields = (result: any) => {
         { label: "Employee ID", value: d.employee_id },
         { label: "Designation", value: d.designation },
         { label: "Period", value: `${d.month} ${d.year}` },
-        { label: "Net Salary", value: `Rs. ${Number(d.amount).toLocaleString()}` },
+        { label: "Net Salary", value: maskAmount(d.amount) },
         { label: "Payment Status", value: d.status, isStatus: true },
-        { label: "Paid On", value: d.paid_at ? fmt(d.paid_at) : "â€”" },
+        { label: "Paid On", value: d.paid_at ? fmt(d.paid_at) : "—" },
         { label: "Assigned Branch", value: d.branch },
-        { label: "Location / City", value: d.city || "â€”" },
+        { label: "Location / City", value: d.city || "—" },
         { label: "Organization", value: "Electric Complaint Solutions (ECS)" },
         { label: "Authenticated By", value: authLabel },
       ];
