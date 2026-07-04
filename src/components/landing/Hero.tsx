@@ -26,7 +26,10 @@ export function Hero() {
             </span>
             <h1 className="mt-6 text-4xl sm:text-5xl lg:text-6xl font-extrabold leading-[1.05]">
               Professional Maintenance &{" "}
-              <span className="bg-gradient-to-r from-brand-yellow to-brand-red bg-clip-text text-transparent">
+              <span
+                className="bg-clip-text text-transparent"
+                style={{ backgroundImage: "linear-gradient(90deg, hsl(38 95% 55%) 0%, hsl(0 85% 55%) 100%)" }}
+              >
                 Technical Solutions
               </span>{" "}
               Across Pakistan
