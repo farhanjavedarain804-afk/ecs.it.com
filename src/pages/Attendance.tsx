@@ -413,11 +413,11 @@ const Attendance = () => {
                           <td className="px-6 py-5 text-muted-foreground font-medium">{r.branch_name || "—"}</td>
                           <td className="px-6 py-5 font-bold text-success">{fmtTime(r.check_in)}</td>
                            <td className="px-6 py-5 text-right">
-                            {r.attendance_date !== pktToday() && !isDeveloper ? (
+                            {r.attendance_date !== pktToday() && !(isDeveloper || hasRole("super_admin")) ? (
                                 <span className="text-[10px] font-black uppercase text-destructive bg-destructive/10 px-3 py-1.5 rounded-lg border border-destructive/20">Session Expired</span>
                             ) : (
                               <button onClick={() => {
-                                  if (isDeveloper) {
+                                  if (isDeveloper || hasRole("super_admin")) {
                                     setCheckoutModal({ staff_id: r.staff_id, staff_name: r.staff_full_name, time: new Date().toISOString().substring(0, 16) });
                                   } else {
                                     handleCheckOut(r.staff_id, r.staff_full_name);
