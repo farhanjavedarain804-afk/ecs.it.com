@@ -16,7 +16,7 @@ const schema = z.object({
 });
 
 export function Contact() {
-  const [state, setState] = useState<{ status: "idle" | "submitting" | "done" | "error"; error?: string }>({ status: "idle" });
+  const [state, setState] = useState<{ status: "idle" | "submitting" | "done" | "error"; error?: string; id?: string }>({ status: "idle" });
 
   const onSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -44,7 +44,8 @@ export function Contact() {
         const errData = await res.json().catch(() => null);
         throw new Error(errData?.error || "Failed to submit request");
       }
-      setState({ status: "done" });
+      const data = await res.json();
+      setState({ status: "done", id: data.id });
     } catch (err: any) {
       setState({ status: "error", error: err.message || "Connection error. Please try again later." });
     }
@@ -93,17 +94,30 @@ export function Contact() {
           {state.status === "error" && (
             <p className="sm:col-span-2 text-sm text-destructive">{state.error}</p>
           )}
-          {state.status === "done" && (
-            <p className="sm:col-span-2 inline-flex items-center gap-2 text-sm text-primary font-semibold">
-              <CheckCircle2 className="h-4 w-4" /> Request received — our team will be in touch.
-            </p>
-          )}
 
-          <div className="sm:col-span-2">
-            <Button type="submit" variant="hero" size="xl" disabled={state.status === "submitting"} className="w-full sm:w-auto">
-              {state.status === "submitting" ? <Loader2 className="animate-spin" /> : <Send />} Submit Request
-            </Button>
-          </div>
+          {state.status === "done" ? (
+            <div className="sm:col-span-2 flex flex-col items-center justify-center p-8 text-center bg-primary/5 rounded-2xl border border-primary/10">
+              <div className="h-12 w-12 rounded-full bg-primary/20 flex items-center justify-center mb-4 text-primary">
+                <CheckCircle2 className="h-6 w-6" />
+              </div>
+              <h3 className="text-xl font-bold mb-2">Request Submitted Successfully!</h3>
+              <p className="text-sm text-muted-foreground mb-6 max-w-md">
+                We've received your service request. Our team will contact you shortly. Please save your reference number below to track the status in the Verification tab.
+              </p>
+              <div className="bg-background border border-border shadow-sm rounded-xl px-6 py-3 font-mono text-xl font-bold tracking-wider text-primary">
+                {state.id}
+              </div>
+              <Button type="button" variant="outline" className="mt-8" onClick={() => setState({ status: "idle" })}>
+                Submit Another Request
+              </Button>
+            </div>
+          ) : (
+            <div className="sm:col-span-2 mt-2">
+              <Button type="submit" variant="hero" size="xl" disabled={state.status === "submitting"} className="w-full sm:w-auto">
+                {state.status === "submitting" ? <Loader2 className="animate-spin" /> : <Send />} Submit Request
+              </Button>
+            </div>
+          )}
         </form>
       </div>
     </section>

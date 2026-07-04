@@ -161,7 +161,7 @@ router.get('/verify/:id', async (req, res) => {
                     type: 'service_request',
                     verified: true,
                     data: {
-                        number: row.id.split('-')[0], // Use first part of UUID as reference number
+                        number: row.id,
                         customer: row.name,
                         status: row.status,
                         branch: row.city_branch || row.branch || row.city || '',

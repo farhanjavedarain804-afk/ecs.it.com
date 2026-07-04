@@ -19,7 +19,8 @@ router.post('/public', async (req, res) => {
         if (name.trim().length < 2) return res.status(400).json({ error: 'Name must be at least 2 characters' });
         if (phone.trim().length < 7) return res.status(400).json({ error: 'Please enter a valid phone number' });
 
-        const id = crypto.randomUUID();
+        // Generate a short, user-friendly ID (e.g. SR-A1B2C3)
+        const id = 'SR-' + crypto.randomBytes(3).toString('hex').toUpperCase();
         
         // Dynamically get columns to avoid ER_BAD_FIELD_ERROR on older DB schemas
         const [columns] = await pool.query("SHOW COLUMNS FROM service_requests");
@@ -53,7 +54,7 @@ router.post('/public', async (req, res) => {
             VALUES (${placeholders})
         `, insertValues);
 
-        res.status(201).json({ success: true, message: 'Service request submitted successfully' });
+        res.status(201).json({ success: true, message: 'Service request submitted successfully', id });
     } catch (err) {
         console.error('[Service Request Error]:', err);
         // Send the real error message back so the frontend can display it
