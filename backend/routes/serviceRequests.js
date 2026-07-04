@@ -111,7 +111,7 @@ router.post('/public', async (req, res) => {
 // @access  Private
 router.get('/', auth(), async (req, res) => {
     try {
-        let query = 'SELECT * FROM service_requests WHERE 1=1';
+        let query = 'SELECT sr.*, b.name as branch_name, b.city as branch_city FROM service_requests sr LEFT JOIN branches b ON sr.branch_id = b.id WHERE 1=1';
         let params = [];
 
         // Determine column for branch filtering
@@ -157,10 +157,11 @@ router.get('/', auth(), async (req, res) => {
         const [requests] = await pool.query(query, params);
         
         // Map old columns to expected new columns for frontend compatibility
-        const mappedRequests = requests.map(req => ({
-            ...req,
-            service_required: req.service_required || req.service,
-            city_branch: req.city_branch || req.branch
+        // Also resolve branch name from the JOIN or fallback to raw stored value
+        const mappedRequests = requests.map(r => ({
+            ...r,
+            service_required: r.service_required || r.service,
+            city_branch: r.branch_name || r.city_branch || r.branch || r.branch_city || r.city || ''
         }));
 
         res.json(mappedRequests);

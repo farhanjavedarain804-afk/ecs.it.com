@@ -154,7 +154,13 @@ router.get('/verify/:id', async (req, res) => {
 
         // 6. Check Service Requests
         try {
-            const [sr] = await pool.query(`SELECT * FROM service_requests WHERE id = ?`, [input]);
+            const [sr] = await pool.query(
+                `SELECT sr.*, b.name as branch_name, b.city as branch_city
+                 FROM service_requests sr
+                 LEFT JOIN branches b ON sr.branch_id = b.id
+                 WHERE sr.id = ?`,
+                [input]
+            );
             if (sr.length > 0) {
                 const row = sr[0];
                 return res.json({
@@ -164,7 +170,7 @@ router.get('/verify/:id', async (req, res) => {
                         number: row.id,
                         customer: row.name,
                         status: row.status,
-                        branch: row.city_branch || row.branch || row.city || '',
+                        branch: row.branch_name || row.city_branch || row.branch || row.city || '',
                         service: row.service_required || row.service || '',
                         phone: row.phone,
                         email: row.email || '',
