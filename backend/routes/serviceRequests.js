@@ -20,24 +20,22 @@ router.post('/public', async (req, res) => {
         if (phone.trim().length < 7) return res.status(400).json({ error: 'Please enter a valid phone number' });
 
         const id = crypto.randomUUID();
-        try {
-            await pool.query(`
-                INSERT INTO service_requests 
-                (id, name, phone, email, service_required, city_branch, status)
-                VALUES (?, ?, ?, ?, ?, ?, 'pending')
-            `, [id, name.trim(), phone.trim(), email?.trim() || null, service_required.trim(), city_branch.trim()]);
-        } catch (insertErr) {
-            // Fallback: If live DB has 'service' instead of 'service_required', try that
-            if (insertErr.code === 'ER_BAD_FIELD_ERROR' && insertErr.message.includes('service_required')) {
-                await pool.query(`
-                    INSERT INTO service_requests 
-                    (id, name, phone, email, service, city_branch, status)
-                    VALUES (?, ?, ?, ?, ?, ?, 'pending')
-                `, [id, name.trim(), phone.trim(), email?.trim() || null, service_required.trim(), city_branch.trim()]);
-            } else {
-                throw insertErr;
-            }
-        }
+        
+        // Dynamically get columns to avoid ER_BAD_FIELD_ERROR on older DB schemas
+        const [columns] = await pool.query("SHOW COLUMNS FROM service_requests");
+        const colNames = columns.map(c => c.Field);
+
+        const dbServiceCol = colNames.includes('service_required') ? 'service_required' : (colNames.includes('service') ? 'service' : null);
+        const dbBranchCol = colNames.includes('city_branch') ? 'city_branch' : (colNames.includes('branch') ? 'branch' : null);
+        
+        if (!dbServiceCol) throw new Error("Database missing service column");
+        if (!dbBranchCol) throw new Error("Database missing branch column");
+
+        await pool.query(`
+            INSERT INTO service_requests 
+            (id, name, phone, email, ${dbServiceCol}, ${dbBranchCol}, status)
+            VALUES (?, ?, ?, ?, ?, ?, 'pending')
+        `, [id, name.trim(), phone.trim(), email?.trim() || null, service_required.trim(), city_branch.trim()]);
 
         res.status(201).json({ success: true, message: 'Service request submitted successfully' });
     } catch (err) {
@@ -60,15 +58,20 @@ router.get('/', auth(), async (req, res) => {
         let query = 'SELECT * FROM service_requests WHERE 1=1';
         let params = [];
 
+        // Determine column for branch filtering
+        const [columns] = await pool.query("SHOW COLUMNS FROM service_requests");
+        const colNames = columns.map(c => c.Field);
+        const dbBranchCol = colNames.includes('city_branch') ? 'city_branch' : (colNames.includes('branch') ? 'branch' : null);
+
         // If user is branch_admin or restricted, only show their branch
-        if (req.user.role !== 'developer' && req.user.role !== 'super_admin' && req.user.branch_id) {
+        if (req.user.role !== 'developer' && req.user.role !== 'super_admin' && req.user.branch_id && dbBranchCol) {
             // We need to match the city_branch string to their branch name/city
             // To do this reliably, let's get the branch name from the database first
             const [branch] = await pool.query('SELECT name, city FROM branches WHERE id = ?', [req.user.branch_id]);
             if (branch.length > 0) {
                 const bName = branch[0].name;
                 const bCity = branch[0].city;
-                query += ' AND (city_branch = ? OR city_branch = ?)';
+                query += ` AND (${dbBranchCol} = ? OR ${dbBranchCol} = ?)`;
                 params.push(bName, bCity);
             }
         }
@@ -77,10 +80,11 @@ router.get('/', auth(), async (req, res) => {
 
         const [requests] = await pool.query(query, params);
         
-        // Map 'service' to 'service_required' for frontend compatibility if needed
+        // Map old columns to expected new columns for frontend compatibility
         const mappedRequests = requests.map(req => ({
             ...req,
-            service_required: req.service_required || req.service
+            service_required: req.service_required || req.service,
+            city_branch: req.city_branch || req.branch
         }));
 
         res.json(mappedRequests);
