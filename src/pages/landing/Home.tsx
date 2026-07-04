@@ -2,6 +2,7 @@ import { Header } from "@/components/landing/Header";
 import { Hero } from "@/components/landing/Hero";
 import { Stats } from "@/components/landing/Stats";
 import { ServicesGrid } from "@/components/landing/ServicesGrid";
+import { BranchesSection } from "@/components/landing/BranchesSection";
 import { WhyChoose } from "@/components/landing/WhyChoose";
 import { Verification } from "@/components/landing/Verification";
 import { Process } from "@/components/landing/Process";
@@ -17,6 +18,7 @@ export default function Home() {
         <Hero />
         <Stats />
         <ServicesGrid />
+        <BranchesSection />
         <WhyChoose />
         <Verification />
         <Process />

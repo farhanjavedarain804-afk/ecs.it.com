@@ -7,7 +7,7 @@ export function ServicesGrid({ heading = true }: { heading?: boolean }) {
     <section id="services" className="py-20 lg:py-28">
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
         {heading && (
-          <div className="max-w-2xl mb-12">
+          <div className="max-w-2xl mb-14">
             <span className="text-xs font-semibold uppercase tracking-widest text-accent">
               What we deliver
             </span>
@@ -34,29 +34,36 @@ function ServiceCard({
   title,
   desc,
   icon: Icon,
+  color,
   index,
 }: {
   title: string;
   desc: string;
   icon: React.ComponentType<{ className?: string }>;
+  color: string;
   index: number;
 }) {
-  const accent = index % 3 === 0 ? "from-brand-blue to-brand-blue/70"
-    : index % 3 === 1 ? "from-brand-red to-brand-red/70"
-    : "from-brand-yellow to-brand-red";
   return (
-    <div className="group relative rounded-2xl bg-card border border-border p-6 shadow-card-soft hover:shadow-brand hover:-translate-y-1 transition-all duration-300 overflow-hidden">
-      <div className={`absolute -top-12 -right-12 h-32 w-32 rounded-full bg-gradient-to-br ${accent} opacity-10 group-hover:opacity-20 transition-opacity`} />
-      <div className={`grid h-12 w-12 place-items-center rounded-xl bg-gradient-to-br ${accent} text-white shadow-spark`}>
-        <Icon className="h-6 w-6" />
+    <div className="group relative rounded-2xl bg-card border border-border p-6 shadow-card-soft hover:shadow-brand hover:-translate-y-1.5 transition-all duration-300 overflow-hidden flex flex-col gap-4">
+      {/* background glow */}
+      <div className={`absolute -top-10 -right-10 h-28 w-28 rounded-full bg-gradient-to-br ${color} opacity-10 group-hover:opacity-20 transition-opacity duration-300`} />
+
+      {/* Icon badge */}
+      <div className={`relative grid h-14 w-14 place-items-center rounded-2xl bg-gradient-to-br ${color} text-white shadow-md group-hover:scale-110 transition-transform duration-300`}>
+        <Icon className="h-7 w-7" />
       </div>
-      <h3 className="mt-5 text-lg font-bold">{title}</h3>
-      <p className="mt-2 text-sm text-muted-foreground leading-relaxed">{desc}</p>
+
+      {/* Content */}
+      <div className="flex-1">
+        <h3 className="text-base font-bold leading-tight">{title}</h3>
+        <p className="mt-2 text-sm text-muted-foreground leading-relaxed">{desc}</p>
+      </div>
+
       <Link
         to="/contact"
-        className="mt-5 inline-flex items-center gap-1 text-sm font-semibold text-primary group-hover:gap-2 transition-all"
+        className={`inline-flex items-center gap-1 text-sm font-semibold bg-gradient-to-r ${color} bg-clip-text text-transparent group-hover:gap-2 transition-all`}
       >
-        View Details <ArrowUpRight className="h-4 w-4" />
+        Request Service <ArrowUpRight className="h-4 w-4 text-primary" />
       </Link>
     </div>
   );
