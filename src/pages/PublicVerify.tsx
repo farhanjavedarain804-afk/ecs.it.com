@@ -165,30 +165,24 @@ const downloadVerificationPDF = (result: any, verifiedId: string) => {
   const margin = 5;
   let y = 0;
 
-  // â”€â”€ White background â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   doc.setFillColor(255, 255, 255);
   doc.rect(0, 0, pageW, 260, "F");
 
-  // â”€â”€ TOP green header bar â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-  doc.setFillColor(16, 185, 129); // emerald-500
-  doc.rect(0, 0, pageW, 20, "F");
+  doc.setFillColor(16, 185, 129);
+  doc.rect(0, 0, pageW, 24, "F");
 
-  // â”€â”€ ECS Logo centered on the green bar â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   try {
-    // white circle bg behind logo so it pops on green
     doc.setFillColor(255, 255, 255);
-    doc.circle(pageW / 2, 10, 9, "F");
-    doc.addImage(ECS_LOGO_BASE64, "PNG", (pageW - 14) / 2, 3, 14, 14);
+    doc.roundedRect((pageW - 22) / 2, 1, 22, 22, 3, 3, "F");
+    doc.addImage(ECS_LOGO_BASE64, "PNG", (pageW - 18) / 2, 3, 18, 18);
   } catch (e) {
-    // fallback: just text
     doc.setTextColor(255, 255, 255);
-    doc.setFontSize(10);
+    doc.setFontSize(11);
     doc.setFont("helvetica", "bold");
-    doc.text("ECS", pageW / 2, 12, { align: "center" });
+    doc.text("ECS", pageW / 2, 14, { align: "center" });
   }
-  y = 24;
+  y = 28;
 
-  // â”€â”€ Title â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   doc.setTextColor(15, 23, 42);
   doc.setFontSize(11);
   doc.setFont("helvetica", "bold");
@@ -198,21 +192,19 @@ const downloadVerificationPDF = (result: any, verifiedId: string) => {
   doc.setFontSize(7);
   doc.setFont("helvetica", "normal");
   doc.setTextColor(71, 85, 105);
-  doc.text("Electric Complaint Solutions â€” Official Document", pageW / 2, y, { align: "center" });
+  doc.text("Electric Complaint Solutions - Official Document", pageW / 2, y, { align: "center" });
   y += 4;
   doc.text(`Issued: ${format(new Date(), "dd MMM yyyy, HH:mm")}`, pageW / 2, y, { align: "center" });
   y += 4;
   doc.text(`Ref ID: ${verifiedId}`, pageW / 2, y, { align: "center" });
-  y += 5;
+  y += 6;
 
-  // â”€â”€ Dashed divider â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   doc.setDrawColor(200, 200, 200);
   doc.setLineDash([1.5, 1.5], 0);
   doc.line(margin, y, pageW - margin, y);
   doc.setLineDash([], 0);
   y += 5;
 
-  // â”€â”€ RECORD VERIFIED label â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   doc.setFontSize(10);
   doc.setFont("helvetica", "bold");
   doc.setTextColor(16, 185, 129); // emerald
@@ -400,9 +392,7 @@ const PublicVerify = ({ onClose, overrideId }: { onClose?: () => void, overrideI
         {/* Header bar */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100 shrink-0">
           <div className="flex items-center gap-3">
-            <div className="w-9 h-9 rounded-xl bg-white shadow border border-slate-100 flex items-center justify-center">
-              <img src={logo} alt="ECS" className="h-5 w-auto" />
-            </div>
+            <img src={logo} alt="ECS" className="h-8 w-auto" />
             <div>
               <p className="text-sm font-black text-slate-800 leading-none">ECS <span className="text-primary">Verify</span></p>
               <p className="text-[10px] text-slate-400 font-semibold uppercase tracking-widest mt-0.5">Secure Authenticity Check</p>
