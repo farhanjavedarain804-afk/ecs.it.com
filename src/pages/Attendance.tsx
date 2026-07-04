@@ -352,8 +352,8 @@ const Attendance = () => {
                   <p className="text-xs text-muted-foreground mt-1 text-right font-semibold">{format(nowPKT, "EEEE, dd MMMM yyyy")}</p>
                 </div>
 
-                {/* Custom Date/Time for Developers Only */}
-                {isDeveloper && (
+                {/* Custom Date/Time for Admins/Developers */}
+                {(isDeveloper || hasRole("super_admin")) && (
                   <div className="space-y-2">
                     <label className="text-[11px] font-bold text-muted-foreground uppercase tracking-widest ml-1">Custom Date & Time (Optional)</label>
                     <div className="relative">
@@ -580,7 +580,7 @@ const Attendance = () => {
             <div className="space-y-4 mb-10">
               <div className="p-6 bg-muted/30 rounded-[1.5rem] border border-border">
                 <p className="text-[10px] font-black text-muted-foreground uppercase tracking-[0.2em] mb-3">Departure Time</p>
-                {isDeveloper ? (
+                {(isDeveloper || hasRole("super_admin")) ? (
                   <div className="relative">
                     <Clock className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-primary" />
                     <input 
@@ -596,7 +596,7 @@ const Attendance = () => {
                     <p className="text-2xl font-black tabular-nums">{format(nowPKT, "hh:mm:ss aa")}</p>
                   </div>
                 )}
-                <p className="text-[10px] text-muted-foreground mt-4 font-bold italic opacity-60">* {isDeveloper ? "You have developer override privileges" : "Only Developers can edit checkout time"}</p>
+                <p className="text-[10px] text-muted-foreground mt-4 font-bold italic opacity-60">* {(isDeveloper || hasRole("super_admin")) ? "You have manual override privileges" : "Only Admins can edit checkout time"}</p>
               </div>
             </div>
 
@@ -608,7 +608,7 @@ const Attendance = () => {
                 Cancel
               </button>
               <button 
-                onClick={() => handleCheckOut(checkoutModal.staff_id, checkoutModal.staff_name, isDeveloper ? checkoutModal.time : undefined)}
+                onClick={() => handleCheckOut(checkoutModal.staff_id, checkoutModal.staff_name, (isDeveloper || hasRole("super_admin")) ? checkoutModal.time : undefined)}
                 disabled={isCheckingOut}
                 className="flex-[2] py-4 bg-primary text-primary-foreground font-bold rounded-[1.5rem] shadow-lg shadow-primary/20 hover:bg-primary/90 transition-all flex items-center justify-center gap-2 active:scale-[0.98]"
               >
