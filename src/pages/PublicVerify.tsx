@@ -9,6 +9,8 @@ import {
 } from "lucide-react";
 import { useParams } from "react-router-dom";
 import logo from "@/assets/logo.png";
+import { ECS_LOGO_BASE64 } from "@/assets/logoBase64";
+import { ECS_STAMP_BASE64 } from "@/assets/stampBase64";
 import { format } from "date-fns";
 import jsPDF from "jspdf";
 
@@ -42,7 +44,6 @@ const typeIcons: Record<string, React.ReactNode> = {
   salary_slip: <CreditCard className="w-7 h-7 text-indigo-600" />,
 };
 
-// --- Summary fields per type ---
 const getSummaryFields = (result: any) => {
   const d = result.data;
   switch (result.type) {
@@ -86,10 +87,10 @@ const getSummaryFields = (result: any) => {
   }
 };
 
-// --- Detailed report fields per type ---
 const getDetailFields = (result: any) => {
   const d = result.data;
   const fmt = (v: string) => { try { return format(new Date(v), "dd MMMM yyyy"); } catch { return v; } };
+  const authLabel = "Digitally Verified by Electric Complaint Solutions (ECS)";
   switch (result.type) {
     case "invoice":
       return [
@@ -101,7 +102,7 @@ const getDetailFields = (result: any) => {
         { label: "Branch", value: d.branch || "Head Office" },
         { label: "Location / City", value: d.city || "—" },
         { label: "Organization", value: "Electric Complaint Solutions (ECS)" },
-        { label: "Authenticated By", value: "ECS Secure Verification System" },
+        { label: "Authenticated By", value: authLabel },
       ];
     case "complaint":
       return [
@@ -125,7 +126,7 @@ const getDetailFields = (result: any) => {
         { label: "CNIC (Partial)", value: d.cnic || "—" },
         { label: "Contact Number", value: d.phone || "—" },
         { label: "Organization", value: "Electric Complaint Solutions (ECS)" },
-        { label: "Authenticated By", value: "ECS Secure Verification System" },
+        { label: "Authenticated By", value: authLabel },
       ];
     case "branch":
       return [
@@ -136,7 +137,7 @@ const getDetailFields = (result: any) => {
         { label: "Contact Phone", value: d.phone },
         { label: "Official Address", value: d.address },
         { label: "Organization", value: "Electric Complaint Solutions (ECS)" },
-        { label: "Authenticated By", value: "ECS Secure Verification System" },
+        { label: "Authenticated By", value: authLabel },
       ];
     case "salary_slip":
       return [
@@ -151,14 +152,13 @@ const getDetailFields = (result: any) => {
         { label: "Assigned Branch", value: d.branch },
         { label: "Location / City", value: d.city || "—" },
         { label: "Organization", value: "Electric Complaint Solutions (ECS)" },
-        { label: "Authenticated By", value: "ECS Secure Verification System" },
+        { label: "Authenticated By", value: authLabel },
       ];
     default:
       return [];
   }
 };
 
-// --- PDF Generator ---
 const downloadVerificationPDF = (result: any, verifiedId: string) => {
   const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
   const pageW = doc.internal.pageSize.getWidth();
@@ -172,6 +172,13 @@ const downloadVerificationPDF = (result: any, verifiedId: string) => {
   // Green header bar
   doc.setFillColor(16, 185, 129);
   doc.rect(0, 0, pageW, 48, "F");
+
+  // Add ECS Logo
+  try {
+    doc.addImage(ECS_LOGO_BASE64, "PNG", pageW - margin - 35, 9, 35, 30);
+  } catch (e) {
+    console.warn("Failed to add logo to PDF", e);
+  }
 
   // Header text
   doc.setTextColor(255, 255, 255);
@@ -193,7 +200,15 @@ const downloadVerificationPDF = (result: any, verifiedId: string) => {
   doc.setTextColor(5, 150, 105);
   doc.setFontSize(10);
   doc.setFont("helvetica", "bold");
-  doc.text("✓  RECORD VERIFIED AUTHENTIC — SEALED BY ECS SECURE SYSTEM", margin + 4, y + 10.5);
+  doc.text("✓  Digitally Verified by Electric Complaint Solutions (ECS)", margin + 4, y + 10.5);
+
+  // Add Verification Stamp
+  try {
+    // 25x25 stamp image aligned to the right inside the badge box
+    doc.addImage(ECS_STAMP_BASE64, "PNG", pageW - margin - 22, y - 4, 24, 24);
+  } catch (e) {
+    console.warn("Failed to add stamp to PDF", e);
+  }
 
   y += 26;
 
@@ -236,13 +251,11 @@ const downloadVerificationPDF = (result: any, verifiedId: string) => {
   doc.setTextColor(100, 116, 139);
   doc.text("This document is an official verification certificate issued by Electric Complaint Solutions.", margin + 4, y + 8);
   doc.text("Any tampering or alteration of this document is illegal and punishable by law.", margin + 4, y + 14);
-  doc.text("Head Office: 1st Floor, Zain Plaza, Islamabad | Tel: +92 310 1111 327 | Email: ecs.isbpak@gmail.com", margin + 4, y + 20);
-  doc.text("Developed By: Devionic (Private) Limited | www.devionic.com", margin + 4, y + 26);
+  doc.text("Developed By Devionic (Private) Limited | +92-317-7121841 Whatsapp | www.devionic.com | info@devionic.com", margin + 4, y + 26);
 
   doc.save(`ECS-Verification-${verifiedId}-${Date.now()}.pdf`);
 };
 
-// --- Status Badge ---
 const StatusBadge = ({ value }: { value: string }) => (
   <span className={`inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-bold uppercase border ${statusColors[value?.toLowerCase()] || "bg-slate-100 text-slate-600 border-slate-200"}`}>
     {["paid", "solved", "active", "completed"].includes(value?.toLowerCase()) && <CheckCircle2 className="w-3 h-3" />}
@@ -302,7 +315,6 @@ const PublicVerify = () => {
 
   return (
     <div className="min-h-screen bg-[#FDFDFF] text-slate-800 font-sans">
-      {/* Background */}
       <div className="fixed inset-0 pointer-events-none overflow-hidden">
         <div className="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] bg-primary/5 rounded-full blur-[100px]" />
         <div className="absolute bottom-[-5%] right-[-5%] w-[30%] h-[30%] bg-emerald-400/5 rounded-full blur-[80px]" />
@@ -327,19 +339,21 @@ const PublicVerify = () => {
         </div>
 
         {/* Hero */}
-        <div className="text-center mb-10">
-          <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}
-            className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-emerald-50 border border-emerald-100 text-emerald-600 text-[11px] font-black uppercase tracking-wider mb-4">
-            <ShieldCheck className="w-4 h-4" /> SECURE DOCUMENT VERIFICATION SYSTEM
-          </motion.div>
-          <h2 className="text-4xl font-black text-slate-900 mb-3 tracking-tight">Trust but <span className="text-primary">Verify.</span></h2>
-          <p className="text-slate-500 max-w-lg mx-auto leading-relaxed font-medium">
-            Enter the verification ID printed on your document or scan the QR code to confirm its authenticity.
-          </p>
-        </div>
+        {!result && (
+          <div className="text-center mb-10">
+            <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}
+              className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-emerald-50 border border-emerald-100 text-emerald-600 text-[11px] font-black uppercase tracking-wider mb-4">
+              <ShieldCheck className="w-4 h-4" /> SECURE DOCUMENT VERIFICATION SYSTEM
+            </motion.div>
+            <h2 className="text-4xl font-black text-slate-900 mb-3 tracking-tight">Trust but <span className="text-primary">Verify.</span></h2>
+            <p className="text-slate-500 max-w-lg mx-auto leading-relaxed font-medium">
+              Enter the verification ID printed on your document or scan the QR code to confirm its authenticity.
+            </p>
+          </div>
+        )}
 
         {/* Search Box */}
-        <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} className="max-w-2xl mx-auto mb-10">
+        <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} className={`max-w-2xl mx-auto ${result ? 'mb-6' : 'mb-10'}`}>
           <form onSubmit={handleSubmit} className="relative group">
             <div className="absolute left-6 top-1/2 -translate-y-1/2 p-2 rounded-xl bg-slate-50 border border-slate-100 text-slate-400 group-focus-within:bg-primary/5 group-focus-within:border-primary/20 group-focus-within:text-primary transition-all">
               <ScanLine className="w-5 h-5" />
@@ -372,7 +386,7 @@ const PublicVerify = () => {
 
           {!loading && result && (
             <motion.div key="result" initial={{ opacity: 0, y: 30 }} animate={{ opacity: 1, y: 0 }}
-              className="max-w-3xl mx-auto rounded-[2.5rem] bg-white border border-slate-100 shadow-xl overflow-hidden">
+              className="max-w-4xl mx-auto rounded-[2.5rem] bg-white border border-slate-100 shadow-2xl overflow-hidden">
 
               {/* Verified Header */}
               <div className="bg-gradient-to-br from-emerald-500 to-emerald-600 p-8 text-white relative overflow-hidden">
@@ -394,12 +408,6 @@ const PublicVerify = () => {
                   {/* Action Buttons */}
                   <div className="flex items-center gap-2 flex-wrap">
                     <button
-                      onClick={() => downloadVerificationPDF(result, verifiedId)}
-                      className="flex items-center gap-2 px-4 py-2.5 bg-white text-emerald-700 rounded-xl text-xs font-black uppercase tracking-wider shadow-md hover:shadow-lg hover:bg-emerald-50 transition-all"
-                    >
-                      <Download className="w-4 h-4" /> Download PDF
-                    </button>
-                    <button
                       onClick={() => window.print()}
                       className="flex items-center gap-2 px-4 py-2.5 bg-white/20 hover:bg-white/30 text-white rounded-xl text-xs font-black uppercase tracking-wider transition-all"
                     >
@@ -409,80 +417,88 @@ const PublicVerify = () => {
                 </div>
               </div>
 
-              {/* Summary Card */}
-              <div className="p-6 grid grid-cols-2 sm:grid-cols-4 gap-4 border-b border-slate-100">
-                {getSummaryFields(result).map((f, i) => (
-                  <div key={i} className="flex flex-col gap-1.5">
-                    <div className="flex items-center gap-1.5 text-slate-400">
-                      {f.icon}
-                      <span className="text-[10px] font-bold uppercase tracking-wider">{f.label}</span>
+              <AnimatePresence mode="wait">
+                {!showDetail ? (
+                  <motion.div key="summary" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
+                    {/* Summary Card */}
+                    <div className="p-8 grid grid-cols-2 sm:grid-cols-4 gap-6 border-b border-slate-100">
+                      {getSummaryFields(result).map((f, i) => (
+                        <div key={i} className="flex flex-col gap-2">
+                          <div className="flex items-center gap-2 text-slate-400">
+                            {f.icon}
+                            <span className="text-[10px] font-bold uppercase tracking-wider">{f.label}</span>
+                          </div>
+                          {(f as any).isStatus
+                            ? <StatusBadge value={f.value} />
+                            : <span className="text-base font-bold text-slate-800 truncate">{f.value || "—"}</span>
+                          }
+                        </div>
+                      ))}
                     </div>
-                    {(f as any).isStatus
-                      ? <StatusBadge value={f.value} />
-                      : <span className="text-sm font-bold text-slate-800 truncate">{f.value || "—"}</span>
-                    }
-                  </div>
-                ))}
-              </div>
 
-              {/* View Detailed Report Toggle */}
-              <div className="px-6 py-4">
-                <button
-                  onClick={() => setShowDetail((v) => !v)}
-                  className="w-full flex items-center justify-between px-5 py-3.5 rounded-xl bg-slate-50 hover:bg-primary/5 border border-slate-100 hover:border-primary/20 transition-all group"
-                >
-                  <span className="text-sm font-bold text-slate-700 group-hover:text-primary">
-                    {showDetail ? "Hide Detailed Report" : "View Detailed Report"}
-                  </span>
-                  <span className="text-slate-400 group-hover:text-primary transition-colors">
-                    {showDetail ? <ChevronUp className="w-5 h-5" /> : <ChevronDown className="w-5 h-5" />}
-                  </span>
-                </button>
-
-                <AnimatePresence>
-                  {showDetail && (
-                    <motion.div
-                      initial={{ opacity: 0, height: 0 }}
-                      animate={{ opacity: 1, height: "auto" }}
-                      exit={{ opacity: 0, height: 0 }}
-                      className="overflow-hidden"
-                    >
-                      <div className="mt-4 rounded-xl border border-slate-100 overflow-hidden">
-                        {getDetailFields(result).map((field, i) => (
-                          <div
-                            key={i}
-                            className={`flex items-start justify-between gap-4 px-5 py-3.5 ${i % 2 === 0 ? "bg-white" : "bg-slate-50/60"}`}
-                          >
-                            <span className="text-[11px] font-bold uppercase tracking-widest text-slate-400 shrink-0 pt-0.5">{field.label}</span>
+                    <div className="p-10 flex flex-col items-center justify-center bg-slate-50/50">
+                      <button
+                        onClick={() => setShowDetail(true)}
+                        className="group relative inline-flex items-center justify-center gap-2 px-8 py-4 bg-slate-900 text-white rounded-2xl font-bold uppercase tracking-wider overflow-hidden hover:scale-105 transition-all shadow-lg hover:shadow-slate-900/20"
+                      >
+                        <div className="absolute inset-0 bg-gradient-to-r from-emerald-500 to-teal-500 opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+                        <span className="relative z-10">View Detailed Report</span>
+                        <ChevronDown className="w-5 h-5 relative z-10 group-hover:translate-y-1 transition-transform" />
+                      </button>
+                    </div>
+                  </motion.div>
+                ) : (
+                  <motion.div key="detail" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} className="p-8 bg-slate-50/50">
+                    <div className="flex items-center justify-between mb-8">
+                      <h4 className="text-lg font-black text-slate-900 tracking-tight">Complete Record Details</h4>
+                      <button
+                        onClick={() => setShowDetail(false)}
+                        className="text-sm font-bold text-slate-400 hover:text-slate-700 flex items-center gap-1 transition-colors"
+                      >
+                        <ArrowLeft className="w-4 h-4" /> Back to Summary
+                      </button>
+                    </div>
+                    
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+                      {getDetailFields(result).map((field, i) => (
+                        <div
+                          key={i}
+                          className="group relative rounded-2xl bg-white border border-slate-100 p-6 shadow-sm hover:shadow-xl hover:shadow-emerald-500/10 hover:-translate-y-1 transition-all duration-300 overflow-hidden flex flex-col gap-2"
+                        >
+                          <div className="absolute -top-10 -right-10 h-28 w-28 rounded-full bg-gradient-to-br from-emerald-400 to-teal-500 opacity-0 group-hover:opacity-10 transition-opacity duration-300" />
+                          <span className="text-[10px] font-bold uppercase tracking-widest text-slate-400 relative z-10">{field.label}</span>
+                          <div className="relative z-10 mt-1">
                             {(field as any).isStatus
                               ? <StatusBadge value={field.value} />
-                              : <span className="text-sm font-semibold text-slate-800 text-right">{field.value || "—"}</span>
+                              : <span className="text-base font-bold text-slate-800 leading-tight">{field.value || "—"}</span>
                             }
                           </div>
-                        ))}
-                      </div>
+                        </div>
+                      ))}
+                    </div>
 
-                      {/* Download CTA at bottom */}
+                    <div className="mt-10 flex flex-col sm:flex-row gap-4">
                       <button
                         onClick={() => downloadVerificationPDF(result, verifiedId)}
-                        className="mt-4 w-full flex items-center justify-center gap-2 px-6 py-4 bg-gradient-to-r from-emerald-500 to-emerald-600 text-white rounded-xl font-black text-sm uppercase tracking-wider shadow-md hover:shadow-lg hover:from-emerald-600 hover:to-emerald-700 transition-all"
+                        className="flex-1 group relative inline-flex items-center justify-center gap-2 px-8 py-5 bg-gradient-to-r from-emerald-500 to-teal-600 text-white rounded-2xl font-black text-sm uppercase tracking-widest overflow-hidden hover:scale-[1.02] transition-all shadow-xl shadow-emerald-500/20"
                       >
-                        <Download className="w-5 h-5" />
-                        Download PDF Verification Report
+                        <div className="absolute inset-0 bg-white/20 translate-y-full group-hover:translate-y-0 transition-transform duration-300" />
+                        <Download className="w-5 h-5 relative z-10 group-hover:-translate-y-1 transition-transform" />
+                        <span className="relative z-10">Download PDF Verification Report</span>
                       </button>
-                    </motion.div>
-                  )}
-                </AnimatePresence>
-              </div>
+                    </div>
+                  </motion.div>
+                )}
+              </AnimatePresence>
 
               {/* Footer stamp */}
-              <div className="mx-6 mb-6 p-4 rounded-xl bg-emerald-50 border border-emerald-100 flex items-center justify-between gap-4">
-                <div className="flex items-center gap-2">
-                  <Globe className="w-4 h-4 text-emerald-500 shrink-0" />
-                  <p className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Public Authenticated Record</p>
+              <div className="m-6 p-5 rounded-2xl bg-emerald-50 border border-emerald-100 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                <div className="flex items-center gap-3">
+                  <Globe className="w-5 h-5 text-emerald-500 shrink-0" />
+                  <p className="text-xs font-bold text-emerald-800 uppercase tracking-wider">Digitally Verified by Electric Complaint Solutions (ECS)</p>
                 </div>
-                <div className="flex items-center gap-2 shrink-0">
-                  <div className="w-9 h-9 rounded-xl bg-emerald-500 flex items-center justify-center text-white">
+                <div className="flex items-center gap-3 shrink-0 bg-white px-4 py-2 rounded-xl border border-emerald-100 shadow-sm">
+                  <div className="w-8 h-8 rounded-lg bg-emerald-500 flex items-center justify-center text-white">
                     <BadgeCheck className="w-5 h-5" />
                   </div>
                   <div className="flex flex-col">
@@ -538,12 +554,8 @@ const PublicVerify = () => {
       <footer className="relative mt-auto py-10 px-6 border-t border-slate-100 bg-white">
         <div className="max-w-4xl mx-auto flex flex-col items-center gap-4">
           <h3 className="text-base font-black text-slate-900 tracking-tight">Electric Complaint Solutions</h3>
-          <div className="flex flex-wrap justify-center gap-6">
-            <span className="flex items-center gap-2 text-sm font-bold text-slate-400"><Phone className="w-4 h-4" /> +92 310 1111 327</span>
-            <span className="flex items-center gap-2 text-sm font-bold text-slate-400"><Globe className="w-4 h-4" /> devionic.com</span>
-          </div>
-          <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest text-center">
-            © 2026 ECS & Devionic (Private) Limited. All documentation verified through this platform is proprietary.
+          <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest text-center max-w-xl leading-relaxed">
+            Developed By Devionic (Private) Limited | +92-317-7121841 Whatsapp | www.devionic.com | info@devionic.com
           </p>
         </div>
       </footer>
