@@ -152,6 +152,30 @@ router.get('/verify/:id', async (req, res) => {
             });
         }
 
+        // 6. Check Service Requests
+        try {
+            const [sr] = await pool.query(`SELECT * FROM service_requests WHERE id = ?`, [input]);
+            if (sr.length > 0) {
+                const row = sr[0];
+                return res.json({
+                    type: 'service_request',
+                    verified: true,
+                    data: {
+                        number: row.id.split('-')[0], // Use first part of UUID as reference number
+                        customer: row.name,
+                        status: row.status,
+                        branch: row.city_branch || row.branch || row.city || '',
+                        service: row.service_required || row.service || '',
+                        phone: row.phone,
+                        email: row.email || '',
+                        date: row.created_at
+                    }
+                });
+            }
+        } catch (e) {
+            // Ignore if table doesn't exist
+        }
+
         res.status(404).json({ error: 'No record found with this ID' });
     } catch (err) {
         console.error('Public Verification Error:', err);

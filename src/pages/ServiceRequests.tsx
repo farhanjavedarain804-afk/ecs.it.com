@@ -2,8 +2,9 @@ import { useState, useEffect } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useToast } from "@/hooks/use-toast";
 import { format } from "date-fns";
-import { Search, Loader2, Phone, Mail, CheckCircle2, XCircle, Trash2, Edit2, AlertCircle } from "lucide-react";
+import { Search, Loader2, Phone, Mail, CheckCircle2, XCircle, Trash2, Edit2, AlertCircle, Eye, Hash, MapPin, Tag, User } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 
 const statusColors: Record<string, string> = {
   pending: "bg-amber-100 text-amber-700",
@@ -17,6 +18,7 @@ const ServiceRequests = () => {
   const [requests, setRequests] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
+  const [selectedReq, setSelectedReq] = useState<any | null>(null);
   const { toast } = useToast();
 
   const fetchRequests = async () => {
@@ -160,6 +162,9 @@ const ServiceRequests = () => {
                     </td>
                     <td className="px-4 py-3 text-right">
                       <div className="flex items-center justify-end gap-2">
+                        <Button variant="outline" size="sm" onClick={() => setSelectedReq(req)} className="h-8 gap-1.5 text-xs">
+                          <Eye className="w-3.5 h-3.5" /> View
+                        </Button>
                         <select
                           className="text-xs bg-background border border-border rounded-md px-2 py-1 focus:outline-none focus:ring-1 focus:ring-primary"
                           value={req.status}
@@ -184,6 +189,59 @@ const ServiceRequests = () => {
           </table>
         </div>
       </div>
+
+      <Dialog open={!!selectedReq} onOpenChange={(open) => !open && setSelectedReq(null)}>
+        <DialogContent className="max-w-md rounded-2xl p-0 overflow-hidden border-none shadow-2xl">
+          <div className="bg-gradient-to-r from-primary to-primary/80 p-6 text-primary-foreground">
+            <DialogHeader>
+              <DialogTitle className="text-xl font-bold flex items-center gap-2">
+                <CheckCircle2 className="w-5 h-5 text-emerald-400" />
+                Service Request Details
+              </DialogTitle>
+              <DialogDescription className="text-primary-foreground/80">
+                Detailed view of the customer's request.
+              </DialogDescription>
+            </DialogHeader>
+          </div>
+          
+          {selectedReq && (
+            <div className="p-6 space-y-5 bg-card">
+              <div className="space-y-4">
+                <div className="flex justify-between items-center border-b border-border pb-3">
+                  <span className="text-xs font-semibold text-muted-foreground uppercase flex items-center gap-1"><Hash className="w-3.5 h-3.5" /> Request ID</span>
+                  <span className="text-sm font-mono bg-muted px-2 py-1 rounded">{selectedReq.id}</span>
+                </div>
+                <div className="flex justify-between items-center border-b border-border pb-3">
+                  <span className="text-xs font-semibold text-muted-foreground uppercase flex items-center gap-1"><User className="w-3.5 h-3.5" /> Customer Name</span>
+                  <span className="text-sm font-medium">{selectedReq.name}</span>
+                </div>
+                <div className="flex justify-between items-center border-b border-border pb-3">
+                  <span className="text-xs font-semibold text-muted-foreground uppercase flex items-center gap-1"><Phone className="w-3.5 h-3.5" /> Contact Number</span>
+                  <span className="text-sm font-medium">{selectedReq.phone}</span>
+                </div>
+                <div className="flex justify-between items-center border-b border-border pb-3">
+                  <span className="text-xs font-semibold text-muted-foreground uppercase flex items-center gap-1"><Mail className="w-3.5 h-3.5" /> Email Address</span>
+                  <span className="text-sm font-medium">{selectedReq.email || "—"}</span>
+                </div>
+                <div className="flex justify-between items-center border-b border-border pb-3">
+                  <span className="text-xs font-semibold text-muted-foreground uppercase flex items-center gap-1"><Tag className="w-3.5 h-3.5" /> Service Required</span>
+                  <span className="text-sm font-medium">{selectedReq.service_required}</span>
+                </div>
+                <div className="flex justify-between items-center border-b border-border pb-3">
+                  <span className="text-xs font-semibold text-muted-foreground uppercase flex items-center gap-1"><MapPin className="w-3.5 h-3.5" /> Branch / City</span>
+                  <span className="text-sm font-medium">{selectedReq.city_branch}</span>
+                </div>
+                <div className="flex justify-between items-center border-b border-border pb-3">
+                  <span className="text-xs font-semibold text-muted-foreground uppercase flex items-center gap-1"><CheckCircle2 className="w-3.5 h-3.5" /> Status</span>
+                  <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider ${statusColors[selectedReq.status] || "bg-muted text-muted-foreground"}`}>
+                    {selectedReq.status.replace(/_/g, " ")}
+                  </span>
+                </div>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };

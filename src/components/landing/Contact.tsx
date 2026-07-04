@@ -85,6 +85,7 @@ export function Contact() {
             <select name="service" required defaultValue="" className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm">
               <option value="" disabled>Select a service</option>
               {SERVICES.map((s) => <option key={s.slug} value={s.title}>{s.title}</option>)}
+              <option value="Other Services">Other Services</option>
             </select>
           </Field>
           <Field label="Message" className="sm:col-span-2"><Textarea name="message" required maxLength={1000} rows={4} placeholder="Tell us about your request..." /></Field>

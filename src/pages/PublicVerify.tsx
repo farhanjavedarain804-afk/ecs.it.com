@@ -34,6 +34,7 @@ const typeLabels: Record<string, string> = {
   staff: "Employee / Technician",
   branch: "Branch Office",
   salary_slip: "Salary Slip",
+  service_request: "Service Request",
 };
 
 const typeIcons: Record<string, React.ReactNode> = {
@@ -42,6 +43,7 @@ const typeIcons: Record<string, React.ReactNode> = {
   staff: <User className="w-7 h-7 text-violet-600" />,
   branch: <Building2 className="w-7 h-7 text-emerald-600" />,
   salary_slip: <CreditCard className="w-7 h-7 text-indigo-600" />,
+  service_request: <CheckCircle2 className="w-7 h-7 text-sky-600" />,
 };
 
 const maskPhone = (val?: string) => val ? val.replace(/.(?=.{4})/g, '*') : '—';
@@ -95,6 +97,13 @@ const getSummaryFields = (result: any) => {
         { icon: <User className="w-4 h-4" />, label: "Employee", value: d.staff },
         { icon: <Hash className="w-4 h-4" />, label: "Employee ID", value: d.employee_id },
         { icon: <Banknote className="w-4 h-4" />, label: "Net Salary", value: maskAmount(d.amount) },
+        { icon: <Tag className="w-4 h-4" />, label: "Status", value: d.status, isStatus: true },
+      ];
+    case "service_request":
+      return [
+        { icon: <Hash className="w-4 h-4" />, label: "Request No.", value: d.number },
+        { icon: <User className="w-4 h-4" />, label: "Customer", value: d.customer },
+        { icon: <Tag className="w-4 h-4" />, label: "Service", value: d.service },
         { icon: <Tag className="w-4 h-4" />, label: "Status", value: d.status, isStatus: true },
       ];
     default:
@@ -172,6 +181,19 @@ const getDetailFields = (result: any) => {
         { label: "Paid On", value: d.paid_at ? fmt(d.paid_at) : "—" },
         { label: "Assigned Branch", value: d.branch },
         { label: "Location / City", value: d.city || "—" },
+        { label: "Organization", value: "Electric Complaint Solutions (ECS)" },
+        { label: "Authenticated By", value: authLabel },
+      ];
+    case "service_request":
+      return [
+        { label: "Request Number", value: d.number },
+        { label: "Customer Name", value: d.customer },
+        { label: "Service Required", value: d.service },
+        { label: "Status", value: d.status, isStatus: true },
+        { label: "Registration Date", value: d.date ? fmt(d.date) : "—" },
+        { label: "Assigned Branch", value: d.branch },
+        ...(d.phone ? [{ label: "Customer Phone", value: maskPhone(d.phone) }] : []),
+        ...(d.email ? [{ label: "Customer Email", value: maskEmail(d.email) }] : []),
         { label: "Organization", value: "Electric Complaint Solutions (ECS)" },
         { label: "Authenticated By", value: authLabel },
       ];
