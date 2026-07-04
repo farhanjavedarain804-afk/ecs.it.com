@@ -26,8 +26,22 @@ router.post('/public', async (req, res) => {
         const [columns] = await pool.query("SHOW COLUMNS FROM service_requests");
         const colNames = columns.map(c => c.Field);
 
-        const dbServiceCol = colNames.includes('service_required') ? 'service_required' : (colNames.includes('service') ? 'service' : null);
-        const dbBranchCol = colNames.includes('city_branch') ? 'city_branch' : (colNames.includes('branch') ? 'branch' : (colNames.includes('city') ? 'city' : null));
+        const dbServiceCol = colNames.includes('service_required') ? 'service_required' : (colNames.includes('service') ? 'service' : 'service_required');
+        const dbBranchCol = colNames.includes('city_branch') ? 'city_branch' : (colNames.includes('branch') ? 'branch' : (colNames.includes('city') ? 'city' : 'city_branch'));
+        
+        // Auto-fix table by adding missing columns to their live DB
+        if (!colNames.includes('service_required') && !colNames.includes('service')) {
+            await pool.query("ALTER TABLE service_requests ADD COLUMN service_required VARCHAR(255) DEFAULT NULL");
+        }
+        if (!colNames.includes('city_branch') && !colNames.includes('branch') && !colNames.includes('city')) {
+            await pool.query("ALTER TABLE service_requests ADD COLUMN city_branch VARCHAR(255) DEFAULT NULL");
+        }
+        if (!colNames.includes('email')) {
+            await pool.query("ALTER TABLE service_requests ADD COLUMN email VARCHAR(255) DEFAULT NULL");
+        }
+        if (!colNames.includes('status')) {
+            await pool.query("ALTER TABLE service_requests ADD COLUMN status VARCHAR(50) DEFAULT 'pending'");
+        }
         
         const insertFields = ['id', 'name', 'phone', 'status'];
         const insertValues = [id, name.trim(), phone.trim(), 'pending'];
@@ -78,7 +92,19 @@ router.get('/', auth(), async (req, res) => {
         // Determine column for branch filtering
         const [columns] = await pool.query("SHOW COLUMNS FROM service_requests");
         const colNames = columns.map(c => c.Field);
-        const dbBranchCol = colNames.includes('city_branch') ? 'city_branch' : (colNames.includes('branch') ? 'branch' : null);
+        
+        // Auto-fix table by adding missing columns to their live DB on GET as well
+        if (!colNames.includes('service_required') && !colNames.includes('service')) {
+            await pool.query("ALTER TABLE service_requests ADD COLUMN service_required VARCHAR(255) DEFAULT NULL");
+        }
+        if (!colNames.includes('city_branch') && !colNames.includes('branch') && !colNames.includes('city')) {
+            await pool.query("ALTER TABLE service_requests ADD COLUMN city_branch VARCHAR(255) DEFAULT NULL");
+        }
+        if (!colNames.includes('status')) {
+            await pool.query("ALTER TABLE service_requests ADD COLUMN status VARCHAR(50) DEFAULT 'pending'");
+        }
+
+        const dbBranchCol = colNames.includes('city_branch') ? 'city_branch' : (colNames.includes('branch') ? 'branch' : (colNames.includes('city') ? 'city' : 'city_branch'));
 
         // If user is branch_admin or restricted, only show their branch
         if (req.user.role !== 'developer' && req.user.role !== 'super_admin' && req.user.branch_id && dbBranchCol) {
