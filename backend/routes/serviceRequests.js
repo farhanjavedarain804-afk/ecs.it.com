@@ -20,11 +20,24 @@ router.post('/public', async (req, res) => {
         if (phone.trim().length < 7) return res.status(400).json({ error: 'Please enter a valid phone number' });
 
         const id = crypto.randomUUID();
-        await pool.query(`
-            INSERT INTO service_requests 
-            (id, name, phone, email, service_required, city_branch, status)
-            VALUES (?, ?, ?, ?, ?, ?, 'pending')
-        `, [id, name.trim(), phone.trim(), email?.trim() || null, service_required.trim(), city_branch.trim()]);
+        try {
+            await pool.query(`
+                INSERT INTO service_requests 
+                (id, name, phone, email, service_required, city_branch, status)
+                VALUES (?, ?, ?, ?, ?, ?, 'pending')
+            `, [id, name.trim(), phone.trim(), email?.trim() || null, service_required.trim(), city_branch.trim()]);
+        } catch (insertErr) {
+            // Fallback: If live DB has 'service' instead of 'service_required', try that
+            if (insertErr.code === 'ER_BAD_FIELD_ERROR' && insertErr.message.includes('service_required')) {
+                await pool.query(`
+                    INSERT INTO service_requests 
+                    (id, name, phone, email, service, city_branch, status)
+                    VALUES (?, ?, ?, ?, ?, ?, 'pending')
+                `, [id, name.trim(), phone.trim(), email?.trim() || null, service_required.trim(), city_branch.trim()]);
+            } else {
+                throw insertErr;
+            }
+        }
 
         res.status(201).json({ success: true, message: 'Service request submitted successfully' });
     } catch (err) {
@@ -63,7 +76,14 @@ router.get('/', auth(), async (req, res) => {
         query += ' ORDER BY created_at DESC';
 
         const [requests] = await pool.query(query, params);
-        res.json(requests);
+        
+        // Map 'service' to 'service_required' for frontend compatibility if needed
+        const mappedRequests = requests.map(req => ({
+            ...req,
+            service_required: req.service_required || req.service
+        }));
+
+        res.json(mappedRequests);
     } catch (err) {
         console.error(err);
         res.status(500).json({ error: 'Server error' });
