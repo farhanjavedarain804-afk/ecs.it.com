@@ -12,20 +12,30 @@ router.post('/public', async (req, res) => {
         const { name, phone, email, service_required, city_branch } = req.body;
 
         if (!name || !phone || !service_required || !city_branch) {
-            return res.status(400).json({ error: 'Please provide all required fields' });
+            return res.status(400).json({ error: 'Please provide all required fields: name, phone, service_required, city_branch' });
         }
+
+        // Validate name and phone lengths
+        if (name.trim().length < 2) return res.status(400).json({ error: 'Name must be at least 2 characters' });
+        if (phone.trim().length < 7) return res.status(400).json({ error: 'Please enter a valid phone number' });
 
         const id = crypto.randomUUID();
         await pool.query(`
             INSERT INTO service_requests 
             (id, name, phone, email, service_required, city_branch, status)
             VALUES (?, ?, ?, ?, ?, ?, 'pending')
-        `, [id, name, phone, email || null, service_required, city_branch]);
+        `, [id, name.trim(), phone.trim(), email?.trim() || null, service_required.trim(), city_branch.trim()]);
 
         res.status(201).json({ success: true, message: 'Service request submitted successfully' });
     } catch (err) {
-        console.error(err);
-        res.status(500).json({ error: 'Server error' });
+        console.error('[Service Request Error]:', err);
+        // Send the real error message back so the frontend can display it
+        const msg = err.code === 'ECONNREFUSED'
+            ? 'Database is currently unreachable. Please try again later.'
+            : err.code === 'ER_NO_SUCH_TABLE'
+            ? 'Service request table not found. Please contact support.'
+            : err.sqlMessage || err.message || 'Server error';
+        res.status(500).json({ error: msg });
     }
 });
 

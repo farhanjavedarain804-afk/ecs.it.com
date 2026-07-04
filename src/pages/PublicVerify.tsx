@@ -216,7 +216,7 @@ const downloadVerificationPDF = (result: any, verifiedId: string) => {
   doc.setFontSize(10);
   doc.setFont("helvetica", "bold");
   doc.setTextColor(16, 185, 129); // emerald
-  doc.text("✔  RECORD VERIFIED", pageW / 2, y, { align: "center" });
+  doc.text("** RECORD VERIFIED **", pageW / 2, y, { align: "center" });
   y += 5;
 
   // ── Green Verified STAMP image ────────────────────────────────
@@ -299,21 +299,25 @@ const downloadVerificationPDF = (result: any, verifiedId: string) => {
 
   doc.setFont("helvetica", "normal");
   doc.setTextColor(71, 85, 105);
-  const footerLines = [
-    "📍 1st Floor, Zain Plaza, Islamabad",
-    "📞 +92 310 1111 327",
-    "✉  ecs.isbpak@gmail.com",
-    "🌐 www.ecs.it.com",
-    "────────────────────",
-    "Digitally Verified by Electric Complaint Solutions (ECS)",
-    "────────────────────",
-    "Developed By Devionic (Private) Limited",
-    "WhatsApp: +92-317-7121841",
-    "www.devionic.com | info@devionic.com",
+
+  // ASCII-safe footer lines (jsPDF only supports Latin-1 in built-in fonts)
+  const footerLines: Array<{ text: string; bold?: boolean; divider?: boolean }> = [
+    { text: "Address: 1st Floor, Zain Plaza, Islamabad" },
+    { text: "Hotline: +92 310 1111 327" },
+    { text: "Email: ecs.isbpak@gmail.com" },
+    { text: "Web: www.ecs.it.com" },
+    { text: "- - - - - - - - - - - - - - - - - - - -", divider: true },
+    { text: "Digitally Verified by Electric Complaint Solutions (ECS)", bold: true },
+    { text: "- - - - - - - - - - - - - - - - - - - -", divider: true },
+    { text: "Developed By Devionic (Private) Limited" },
+    { text: "WhatsApp: +92-317-7121841" },
+    { text: "www.devionic.com | info@devionic.com" },
   ];
-  footerLines.forEach((line) => {
-    doc.setFontSize(line.startsWith("──") ? 5.5 : 6);
-    const wrapped = doc.splitTextToSize(line, pageW - margin * 2);
+  footerLines.forEach(({ text, bold, divider }) => {
+    doc.setFontSize(divider ? 5 : 6);
+    doc.setFont("helvetica", bold ? "bold" : "normal");
+    if (bold) doc.setTextColor(15, 23, 42); else doc.setTextColor(100, 116, 139);
+    const wrapped = doc.splitTextToSize(text, pageW - margin * 2);
     doc.text(wrapped, pageW / 2, y, { align: "center" });
     y += (wrapped.length * 3.5) + 0.5;
   });
@@ -542,18 +546,17 @@ const PublicVerify = ({ onClose, overrideId }: { onClose?: () => void, overrideI
                         </button>
                       </div>
                       
-                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                         {getDetailFields(result).map((field, i) => (
                           <div
                             key={i}
-                            className="group relative rounded-2xl bg-white border border-slate-100 p-6 shadow-sm hover:shadow-xl hover:shadow-emerald-500/10 hover:-translate-y-1 transition-all duration-300 overflow-hidden flex flex-col gap-2"
+                            className="group relative rounded-2xl bg-white p-5 hover:bg-emerald-50/50 hover:-translate-y-0.5 transition-all duration-200 overflow-hidden flex flex-col gap-1.5"
                           >
-                            <div className="absolute -top-10 -right-10 h-28 w-28 rounded-full bg-gradient-to-br from-emerald-400 to-teal-500 opacity-0 group-hover:opacity-10 transition-opacity duration-300" />
                             <span className="text-[10px] font-bold uppercase tracking-widest text-slate-400 relative z-10">{field.label}</span>
-                            <div className="relative z-10 mt-1">
+                            <div className="relative z-10">
                               {(field as any).isStatus
                                 ? <StatusBadge value={field.value} />
-                                : <span className="text-base font-bold text-slate-800 leading-tight">{field.value || "—"}</span>
+                                : <span className="text-sm font-bold text-slate-800 leading-tight">{field.value || "—"}</span>
                               }
                             </div>
                           </div>
