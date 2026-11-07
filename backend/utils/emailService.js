@@ -180,7 +180,27 @@ const buildEmailTemplate = (company, title, bodyContent) => {
     `;
 };
 
-// Generic mail sender
+// Helper to extract clean plain text from HTML for anti-spam multipart delivery
+const htmlToPlainText = (html) => {
+    if (!html) return '';
+    return html
+        .replace(/<style[^>]*>[\s\S]*?<\/style>/gi, '')
+        .replace(/<script[^>]*>[\s\S]*?<\/script>/gi, '')
+        .replace(/<\/tr>/gi, '\n')
+        .replace(/<\/p>/gi, '\n\n')
+        .replace(/<br\s*\/?>/gi, '\n')
+        .replace(/<\/h[1-6]>/gi, '\n\n')
+        .replace(/<[^>]+>/g, '')
+        .replace(/&nbsp;/g, ' ')
+        .replace(/&amp;/g, '&')
+        .replace(/&lt;/g, '<')
+        .replace(/&gt;/g, '>')
+        .replace(/&quot;/g, '"')
+        .replace(/\n\s+\n/g, '\n\n')
+        .trim();
+};
+
+// Generic mail sender with anti-spam deliverability headers & multipart text
 const sendMail = async ({ to, subject, html, attachments = [] }) => {
     try {
         if (!to || !to.includes('@')) {
@@ -202,16 +222,27 @@ const sendMail = async ({ to, subject, html, attachments = [] }) => {
         const company = await getCompanyInfo();
         const transporter = createTransporter(smtp);
 
-        const senderName = smtp.sender_name || company.name || 'ECS IT Solutions';
-        const senderEmail = smtp.sender_email || smtp.user;
+        const senderName = smtp.sender_name || company.name || 'Electric Complaint Solutions';
+        // Always align the From address with authenticated SMTP user so SPF and DKIM pass
+        const senderEmail = smtp.user || smtp.sender_email;
         const from = `"${senderName}" <${senderEmail}>`;
+        const replyTo = company.email || senderEmail;
+        const plainText = htmlToPlainText(html);
 
         const info = await transporter.sendMail({
             from,
             to,
+            replyTo,
             subject,
+            text: plainText,
             html,
-            attachments
+            attachments,
+            headers: {
+                'X-Mailer': 'ECS-Portal/2.0',
+                'X-Priority': '3',
+                'Auto-Submitted': 'auto-generated',
+                'X-Auto-Response-Suppress': 'OOF, AutoReply'
+            }
         });
 
         console.log(`[EmailService] Email sent successfully to ${to} (MessageId: ${info.messageId})`);
@@ -480,7 +511,7 @@ const testSmtpConnection = async (smtpConfig, testRecipient) => {
     await transporter.verify();
 
     if (testRecipient && testRecipient.includes('@')) {
-        const company = await getCompanyInfo(branch?.id || invoice?.branch_id);
+        const company = await getCompanyInfo();
         const testHtml = buildEmailTemplate(
             company,
             'SMTP Configuration Test',
@@ -497,14 +528,21 @@ const testSmtpConnection = async (smtpConfig, testRecipient) => {
             `
         );
 
-        const senderName = smtpConfig.sender_name || company.name || 'ECS IT Solutions';
-        const senderEmail = smtpConfig.sender_email || smtpConfig.user;
+        const senderName = smtpConfig.sender_name || company.name || 'Electric Complaint Solutions';
+        const senderEmail = smtpConfig.user || smtpConfig.sender_email;
 
         await transporter.sendMail({
             from: `"${senderName}" <${senderEmail}>`,
             to: testRecipient,
+            replyTo: company.email || senderEmail,
             subject: `✅ SMTP Test Email - ${company.name}`,
-            html: testHtml
+            text: htmlToPlainText(testHtml),
+            html: testHtml,
+            headers: {
+                'X-Mailer': 'ECS-Portal/2.0',
+                'X-Priority': '3',
+                'Auto-Submitted': 'auto-generated'
+            }
         });
     }
 
