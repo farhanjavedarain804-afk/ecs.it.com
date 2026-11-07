@@ -3,6 +3,7 @@ const router = express.Router();
 const pool = require('../config/db');
 const auth = require('../middleware/auth');
 const emailService = require('../utils/emailService');
+const { upsertSetting } = require('../utils/settingsHelper');
 
 // @route   POST /api/settings/smtp_test
 // @desc    Test SMTP connection and optionally send a test email
@@ -53,15 +54,7 @@ router.patch('/:key', auth(), async (req, res) => {
         
         console.log(`[Settings] Update request for ${key}:`, value);
 
-        // Check if setting exists
-        const [exists] = await pool.query('SELECT `key` FROM settings WHERE `key` = ?', [key]);
-        
-        if (exists.length > 0) {
-            await pool.query('UPDATE settings SET value = ?, updated_at = NOW() WHERE `key` = ?', [JSON.stringify(value), key]);
-        } else {
-            const id = require('crypto').randomUUID();
-            await pool.query('INSERT INTO settings (id, `key`, value) VALUES (?, ?, ?)', [id, key, JSON.stringify(value)]);
-        }
+        await upsertSetting(pool, key, value);
         
         res.json({ success: true, message: `Setting ${key} updated` });
     } catch (err) {

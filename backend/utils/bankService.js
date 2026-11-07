@@ -1,4 +1,5 @@
 const crypto = require('crypto');
+const { upsertSetting } = require('./settingsHelper');
 
 // Default initial bank account if none configured yet
 const DEFAULT_BANK_ACCOUNT = {
@@ -75,12 +76,7 @@ const saveBankSettings = async (pool, bankSettings) => {
     const payload = { accounts, branch_mappings };
 
     // 1. Save in settings table
-    const [exists] = await pool.query("SELECT `key` FROM settings WHERE `key` = 'bank_settings'");
-    if (exists.length > 0) {
-        await pool.query("UPDATE settings SET value = ?, updated_at = NOW() WHERE `key` = 'bank_settings'", [JSON.stringify(payload)]);
-    } else {
-        await pool.query("INSERT INTO settings (id, `key`, value) VALUES (?, 'bank_settings', ?)", [crypto.randomUUID(), JSON.stringify(payload)]);
-    }
+    await upsertSetting(pool, 'bank_settings', payload);
 
     // 2. Sync default bank account into company_settings table for backward compatibility
     if (defaultAcc) {

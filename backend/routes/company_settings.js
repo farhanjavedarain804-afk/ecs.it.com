@@ -4,6 +4,7 @@ const pool = require('../config/db');
 const auth = require('../middleware/auth');
 const crypto = require('crypto');
 const bankService = require('../utils/bankService');
+const { upsertSetting } = require('../utils/settingsHelper');
 
 const DEFAULT_COMPANY_SETTINGS = {
     company_name: 'Electric Complaint Solutions',
@@ -107,10 +108,8 @@ router.patch('/:id', auth(['super_admin', 'developer']), async (req, res) => {
             if (exists.length > 0 && exists[0].value) {
                 const current = typeof exists[0].value === 'string' ? JSON.parse(exists[0].value) : exists[0].value;
                 merged = { ...current, ...updates };
-                await pool.query("UPDATE settings SET value = ?, updated_at = NOW() WHERE `key` = 'company_profile'", [JSON.stringify(merged)]);
-            } else {
-                await pool.query("INSERT INTO settings (id, `key`, value) VALUES (?, 'company_profile', ?)", [crypto.randomUUID(), JSON.stringify(merged)]);
             }
+            await upsertSetting(pool, 'company_profile', merged);
         } catch (setErr) {
             console.error('Settings backup error:', setErr.message);
         }
