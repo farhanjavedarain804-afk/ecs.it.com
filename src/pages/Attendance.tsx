@@ -166,6 +166,7 @@ const Attendance = () => {
   // ── Actions ─────────────────────────────────────────────────────────────────
 
   const canMarkAttendance = hasRole(["super_admin", "branch_admin"]) || isDeveloper;
+  const canDeleteAttendance = isDeveloper || hasRole("super_admin");
 
   const handleCheckIn = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -222,13 +223,19 @@ const Attendance = () => {
   };
 
   const handleDelete = async (id: string) => {
-    if (!isDeveloper) {
-      toast({ title: "Access Denied", description: "Only developers can delete records", variant: "destructive" }); return;
+    if (!canDeleteAttendance) {
+      toast({ title: "Access Denied", description: "Only developers and super admins can delete records", variant: "destructive" }); return;
     }
     if (!confirm("Delete this attendance record?")) return;
     try {
-      await fetch(`${API}/api/attendance/${id}`, { method: "DELETE", headers });
-      fetchAll();
+      const res = await fetch(`${API}/api/attendance/${id}`, { method: "DELETE", headers });
+      if (res.ok) {
+        toast({ title: "Record deleted successfully" });
+        fetchAll();
+      } else {
+        const data = await res.json();
+        toast({ title: "Delete Failed", description: data.error || "Server error", variant: "destructive" });
+      }
     } catch (e: any) {
       toast({ title: "Error", description: e.message, variant: "destructive" });
     }
@@ -413,20 +420,30 @@ const Attendance = () => {
                           <td className="px-6 py-5 text-muted-foreground font-medium">{r.branch_name || "—"}</td>
                           <td className="px-6 py-5 font-bold text-success">{fmtTime(r.check_in)}</td>
                            <td className="px-6 py-5 text-right">
-                            {r.attendance_date !== pktToday() && !(isDeveloper || hasRole("super_admin")) ? (
-                                <span className="text-[10px] font-black uppercase text-destructive bg-destructive/10 px-3 py-1.5 rounded-lg border border-destructive/20">Session Expired</span>
-                            ) : (
-                              <button onClick={() => {
-                                  if (isDeveloper || hasRole("super_admin")) {
-                                    setCheckoutModal({ staff_id: r.staff_id, staff_name: r.staff_full_name, time: new Date().toISOString().substring(0, 16) });
-                                  } else {
-                                    handleCheckOut(r.staff_id, r.staff_full_name);
-                                  }
-                                }}
-                                className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-orange-100 text-orange-600 text-xs font-bold hover:bg-orange-200 transition-colors border border-orange-200 shadow-sm">
-                                <Clock className="w-4 h-4" /> Check Out
-                              </button>
-                            )}
+                            <div className="flex items-center justify-end gap-2">
+                              {r.attendance_date !== pktToday() && !canDeleteAttendance ? (
+                                  <span className="text-[10px] font-black uppercase text-destructive bg-destructive/10 px-3 py-1.5 rounded-lg border border-destructive/20">Session Expired</span>
+                              ) : (
+                                <button onClick={() => {
+                                    if (canDeleteAttendance) {
+                                      setCheckoutModal({ staff_id: r.staff_id, staff_name: r.staff_full_name, time: new Date().toISOString().substring(0, 16) });
+                                    } else {
+                                      handleCheckOut(r.staff_id, r.staff_full_name);
+                                    }
+                                  }}
+                                  className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-orange-100 text-orange-600 text-xs font-bold hover:bg-orange-200 transition-colors border border-orange-200 shadow-sm">
+                                  <Clock className="w-4 h-4" /> Check Out
+                                </button>
+                              )}
+                              {canDeleteAttendance && (
+                                <button 
+                                  onClick={() => handleDelete(r.id)} 
+                                  title="Delete active session"
+                                  className="inline-flex items-center p-2 rounded-xl text-destructive hover:bg-destructive/10 border border-destructive/20 transition-colors">
+                                  <Trash2 className="w-4 h-4" />
+                                </button>
+                              )}
+                            </div>
                           </td>
                         </tr>
                       ))}
@@ -466,8 +483,8 @@ const Attendance = () => {
                           <td className="px-6 py-5 text-destructive font-medium">{fmtTime(r.check_out)}</td>
                           <td className="px-6 py-5 font-bold">{workTime(r.check_in, r.check_out)}</td>
                           <td className="px-6 py-5 text-right">
-                            {isDeveloper && (
-                              <button onClick={() => handleDelete(r.id)} className="p-2 text-destructive hover:bg-destructive/10 rounded-lg">
+                            {canDeleteAttendance && (
+                              <button onClick={() => handleDelete(r.id)} title="Delete record" className="p-2 text-destructive hover:bg-destructive/10 rounded-lg">
                                 <Trash2 className="w-4 h-4" />
                               </button>
                             )}
@@ -520,19 +537,19 @@ const Attendance = () => {
                     <th className="px-4 py-4 text-left font-black uppercase text-[10px] tracking-widest text-success">Check-In</th>
                     <th className="px-4 py-4 text-left font-black uppercase text-[10px] tracking-widest text-destructive">Check-Out</th>
                     <th className="px-4 py-4 text-right font-black uppercase text-[10px] tracking-widest text-muted-foreground">Duration</th>
-                    {isDeveloper && <th className="px-4 py-4 text-right font-black uppercase text-[10px] tracking-widest text-primary">Action</th>}
+                    {canDeleteAttendance && <th className="px-4 py-4 text-right font-black uppercase text-[10px] tracking-widest text-primary">Action</th>}
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-border">
                   {historyModal.history?.length === 0 ? (
-                    <tr><td colSpan={isDeveloper ? 5 : 4} className="py-8 text-center text-muted-foreground italic">No attendance records this month.</td></tr>
+                    <tr><td colSpan={canDeleteAttendance ? 5 : 4} className="py-8 text-center text-muted-foreground italic">No attendance records this month.</td></tr>
                   ) : historyModal.history?.map((h: any) => (
                     <tr key={h.id} className="hover:bg-muted/50">
                       <td className="px-4 py-3 font-semibold">{fmtDate(h.attendance_date)}</td>
                       <td className="px-4 py-3 text-success font-medium">{fmtTime(h.check_in)}</td>
                       <td className="px-4 py-3 text-destructive font-medium">{fmtTime(h.check_out)}</td>
                       <td className="px-4 py-3 text-right font-bold">{workTime(h.check_in, h.check_out)}</td>
-                      {isDeveloper && (
+                      {canDeleteAttendance && (
                         <td className="px-4 py-3 text-right">
                           <button 
                             onClick={async () => {
@@ -544,6 +561,7 @@ const Attendance = () => {
                               });
                             }} 
                             className="p-1.5 text-destructive hover:bg-destructive/10 rounded-lg transition-colors"
+                            title="Delete record"
                           >
                             <Trash2 className="w-4 h-4" />
                           </button>

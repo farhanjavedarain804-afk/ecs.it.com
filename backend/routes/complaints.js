@@ -19,6 +19,7 @@ router.get('/', auth(), async (req, res) => {
                 cust.name as customer_name,
                 cust.address as customer_address,
                 cust.phone as customer_phone,
+                cust.email as customer_email,
                 cust.city as customer_city,
                 b.name as branch_name,
                 b.city as branch_city,
@@ -96,6 +97,7 @@ router.get('/', auth(), async (req, res) => {
                     name: r.customer_name,
                     address: r.customer_address,
                     phone: r.customer_phone,
+                    email: r.customer_email,
                     city: r.customer_city || r.branch_city || ''
                 },
                 branches: { name: r.branch_name, city: r.branch_city },
@@ -111,10 +113,23 @@ router.get('/', auth(), async (req, res) => {
     }
 });
 
+// Helper to ensure serial_number column exists in complaints table
+const ensureComplaintColumns = async () => {
+    try {
+        const [cols] = await pool.query("SHOW COLUMNS FROM complaints LIKE 'serial_number'");
+        if (cols.length === 0) {
+            await pool.query("ALTER TABLE complaints ADD COLUMN serial_number VARCHAR(100) DEFAULT NULL");
+        }
+    } catch (e) {
+        console.error('Error ensuring serial_number column:', e.message);
+    }
+};
+
 // @route   POST /api/complaints
 router.post('/', auth(), async (req, res) => {
     try {
-        const { customer_id, branch_id, complaint_type, priority, description, notes, warranty_type, assigned_to, assigned_helper, attachments } = req.body;
+        await ensureComplaintColumns();
+        const { customer_id, branch_id, complaint_type, priority, description, notes, warranty_type, assigned_to, assigned_helper, attachments, serial_number } = req.body;
 
         // Format: ECS-MMYYYY-COM-XXXXX
         const date = new Date();
@@ -136,10 +151,10 @@ router.post('/', auth(), async (req, res) => {
         let finalAttachments = (attachments && Array.isArray(attachments)) ? JSON.stringify(attachments) : (attachments || '[]');
 
         await pool.query(
-            'INSERT INTO complaints (id, complaint_number, verification_id, customer_id, branch_id, complaint_type, priority, status, description, notes, warranty_type, assigned_to, assigned_helper, attachments) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
-            [id, complaintNumber, verificationId, customer_id, branch_id, complaint_type, priority, 'registered', description, notes, warranty_type || 'non_warranty', assigned_to || null, assigned_helper || null, finalAttachments]
+            'INSERT INTO complaints (id, complaint_number, verification_id, customer_id, branch_id, complaint_type, priority, status, description, notes, warranty_type, assigned_to, assigned_helper, attachments, serial_number) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+            [id, complaintNumber, verificationId, customer_id, branch_id, complaint_type, priority, 'registered', description, notes, warranty_type || 'non_warranty', assigned_to || null, assigned_helper || null, finalAttachments, serial_number || null]
         );
-        res.status(201).json({ id, complaint_number: complaintNumber, verification_id: verificationId });
+        res.status(201).json({ id, complaint_number: complaintNumber, verification_id: verificationId, serial_number });
     } catch (err) {
         console.error('Complaint Creation Error:', err);
         res.status(500).json({ error: 'Server error' });

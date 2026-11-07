@@ -96,6 +96,7 @@ CREATE TABLE IF NOT EXISTS complaints (
     priority ENUM('low', 'medium', 'high', 'emergency') NOT NULL DEFAULT 'medium',
     status ENUM('registered', 'assigned', 'in_progress', 'completed', 'solved', 'invoice_generated', 'closed', 'dismissed') NOT NULL DEFAULT 'registered',
     description TEXT NOT NULL,
+    serial_number VARCHAR(100),
     resolution_time VARCHAR(100),
     notes TEXT,
     attachments JSON, -- Stores array of strings

@@ -226,7 +226,7 @@ router.post('/check-out', auth(['branch_admin']), async (req, res) => {
 });
 
 // @route   DELETE /api/attendance/:id
-router.delete('/:id', auth(['developer']), async (req, res) => {
+router.delete('/:id', auth(['developer', 'super_admin']), async (req, res) => {
     try {
         await pool.query('DELETE FROM attendance WHERE id = ?', [req.params.id]);
         res.json({ message: 'Deleted' });

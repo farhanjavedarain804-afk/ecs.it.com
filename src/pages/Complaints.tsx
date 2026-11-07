@@ -40,6 +40,7 @@ const Complaints = () => {
   // Customer type: new or old
   const [customerType, setCustomerType] = useState<"old" | "new">("old");
   const [customerSearch, setCustomerSearch] = useState("");
+  const [existingCustomerEmail, setExistingCustomerEmail] = useState("");
 
   // New customer fields
   const [newCustomer, setNewCustomer] = useState({ name: "", phone: "", email: "", address: "", city: "", branch_id: "" });
@@ -50,6 +51,7 @@ const Complaints = () => {
     branch_id: "",
     complaint_type: "repair" as "installation" | "repair" | "maintenance",
     priority: "medium" as "low" | "medium" | "high" | "emergency",
+    serial_number: "",
     description: "",
     notes: "",
     warranty_type: "non_warranty",
@@ -157,11 +159,17 @@ const Complaints = () => {
     e.preventDefault();
 
     let customerId = form.customer_id;
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
     // If new customer, check for existing by phone + branch first
     if (customerType === "new" && !editingId) {
-      if (!newCustomer.name || !newCustomer.phone) {
-        toast({ title: "Customer name and phone required", variant: "destructive" });
+      if (!newCustomer.name?.trim() || !newCustomer.phone?.trim() || !newCustomer.email?.trim()) {
+        toast({ title: "Validation Error", description: "Name, phone, and email * are mandatory.", variant: "destructive" });
+        return;
+      }
+
+      if (!emailRegex.test(newCustomer.email.trim())) {
+        toast({ title: "Invalid Email", description: "Please enter a valid email address.", variant: "destructive" });
         return;
       }
 
@@ -190,9 +198,9 @@ const Complaints = () => {
               'Content-Type': 'application/json'
             },
             body: JSON.stringify({
-              name: newCustomer.name,
-              phone: newCustomer.phone,
-              email: newCustomer.email || null,
+              name: newCustomer.name.trim(),
+              phone: newCustomer.phone.trim(),
+              email: newCustomer.email.trim(),
               address: newCustomer.address,
               city: branches.find(b => b.id === (form.branch_id || newCustomer.branch_id))?.city || "",
               branch_id: form.branch_id || newCustomer.branch_id || null,
@@ -212,6 +220,36 @@ const Complaints = () => {
           return;
         }
       }
+    } else if (customerType === "old" && !editingId) {
+      // For existing customer, ensure email is present
+      const selectedCust = customers.find(c => c.id === form.customer_id);
+      const custEmail = selectedCust?.email || existingCustomerEmail;
+      if (!custEmail || !custEmail.trim()) {
+        toast({ title: "Email Required", description: "Customer email * is mandatory to register a complaint.", variant: "destructive" });
+        return;
+      }
+      if (!emailRegex.test(custEmail.trim())) {
+        toast({ title: "Invalid Email", description: "Please enter a valid email address.", variant: "destructive" });
+        return;
+      }
+
+      // If existing customer did not have an email saved, update it in DB now
+      if (!selectedCust?.email && existingCustomerEmail.trim()) {
+        try {
+          const API_URL = import.meta.env.VITE_API_URL ?? '';
+          await fetch(`${API_URL}/api/customers/${selectedCust.id}`, {
+            method: 'PATCH',
+            headers: {
+              'Authorization': `Bearer ${localStorage.getItem('ecs_token')}`,
+              'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ email: existingCustomerEmail.trim() })
+          });
+          setCustomers(prev => prev.map(c => c.id === selectedCust.id ? { ...c, email: existingCustomerEmail.trim() } : c));
+        } catch (e) {
+          console.error("Could not update customer email:", e);
+        }
+      }
     }
 
     if (!customerId || !form.branch_id || !form.description) {
@@ -224,6 +262,7 @@ const Complaints = () => {
       branch_id: form.branch_id,
       complaint_type: form.complaint_type,
       priority: form.priority,
+      serial_number: form.serial_number ? form.serial_number.trim() : null,
       description: form.description,
       notes: form.notes || null,
       warranty_type: form.warranty_type,
@@ -328,6 +367,7 @@ const Complaints = () => {
     setEditingId(null);
     setCustomerType("old");
     setCustomerSearch("");
+    setExistingCustomerEmail("");
     setNewCustomer({
       name: "",
       phone: "",
@@ -341,6 +381,7 @@ const Complaints = () => {
       branch_id: isBranchAdmin ? (branchId || "") : "",
       complaint_type: "repair",
       priority: "medium",
+      serial_number: "",
       description: "",
       notes: "",
       warranty_type: "non_warranty",
@@ -371,11 +412,13 @@ const Complaints = () => {
       return;
     }
     setCustomerType("old");
+    setExistingCustomerEmail("");
     setForm({
       customer_id: c.customer_id || "",
       branch_id: c.branch_id || "",
       complaint_type: c.complaint_type,
       priority: c.priority,
+      serial_number: c.serial_number || "",
       description: c.description,
       notes: c.notes || "",
       warranty_type: c.warranty_type || "non_warranty",
@@ -774,9 +817,25 @@ const Complaints = () => {
                                 <h5 className="text-[10px] font-bold text-primary uppercase tracking-widest">Active Selection</h5>
                                 <p className="text-sm font-bold mt-1 text-foreground">{customers.find(c => c.id === form.customer_id)?.name}</p>
                                 <p className="text-xs text-muted-foreground font-mono">{customers.find(c => c.id === form.customer_id)?.customer_id} | {customers.find(c => c.id === form.customer_id)?.phone}</p>
+                                {customers.find(c => c.id === form.customer_id)?.email && (
+                                  <p className="text-xs text-muted-foreground font-mono mt-0.5">{customers.find(c => c.id === form.customer_id)?.email}</p>
+                                )}
                               </div>
                               <button type="button" onClick={() => setForm({ ...form, customer_id: "" })} className="text-[10px] font-bold text-destructive uppercase hover:underline">Clear</button>
                             </div>
+                            {!customers.find(c => c.id === form.customer_id)?.email && (
+                              <div className="mt-3 pt-2.5 border-t border-primary/10">
+                                <label className={labelClass}>Customer Email * (Mandatory)</label>
+                                <input
+                                  type="email"
+                                  required
+                                  value={existingCustomerEmail}
+                                  onChange={(e) => setExistingCustomerEmail(e.target.value)}
+                                  className={inputClass}
+                                  placeholder="Enter customer email (required to register)..."
+                                />
+                              </div>
+                            )}
                           </div>
                         )}
                       </div>
@@ -787,11 +846,11 @@ const Complaints = () => {
                         <Plus className="w-3 h-3" /> New Customer
                       </h4>
                       <div className="grid grid-cols-2 gap-4">
-                        <div><label className={labelClass}>Name *</label><input value={newCustomer.name} onChange={(e) => setNewCustomer({ ...newCustomer, name: e.target.value })} className={inputClass} /></div>
-                        <div><label className={labelClass}>Phone *</label><input value={newCustomer.phone} onChange={(e) => setNewCustomer({ ...newCustomer, phone: e.target.value })} className={inputClass} /></div>
+                        <div><label className={labelClass}>Name *</label><input required value={newCustomer.name} onChange={(e) => setNewCustomer({ ...newCustomer, name: e.target.value })} className={inputClass} placeholder="Full Name" /></div>
+                        <div><label className={labelClass}>Phone *</label><input required value={newCustomer.phone} onChange={(e) => setNewCustomer({ ...newCustomer, phone: e.target.value })} className={inputClass} placeholder="Phone Number" /></div>
                       </div>
-                      <div><label className={labelClass}>Email</label><input type="email" value={newCustomer.email} onChange={(e) => setNewCustomer({ ...newCustomer, email: e.target.value })} className={inputClass} /></div>
-                      <div><label className={labelClass}>Address</label><input value={newCustomer.address} onChange={(e) => setNewCustomer({ ...newCustomer, address: e.target.value })} className={inputClass} /></div>
+                      <div><label className={labelClass}>Email * (Mandatory)</label><input type="email" required value={newCustomer.email} onChange={(e) => setNewCustomer({ ...newCustomer, email: e.target.value })} className={inputClass} placeholder="customer@example.com" /></div>
+                      <div><label className={labelClass}>Address</label><input value={newCustomer.address} onChange={(e) => setNewCustomer({ ...newCustomer, address: e.target.value })} className={inputClass} placeholder="Street Address" /></div>
                     </div>
                   )}
 
@@ -799,7 +858,7 @@ const Complaints = () => {
                     <h4 className="text-xs font-bold text-primary uppercase tracking-widest flex items-center gap-2">
                       <Filter className="w-3 h-3" /> Service Metrics
                     </h4>
-                    <div className="grid grid-cols-2 gap-4">
+                    <div className="grid grid-cols-3 gap-3">
                       <div><label className={labelClass}>Priority</label>
                         <select value={form.priority} onChange={(e) => setForm({ ...form, priority: e.target.value as any })} className={inputClass}>
                           <option value="low">Low</option>
@@ -813,6 +872,15 @@ const Complaints = () => {
                           <option value="warranty">Warranty</option>
                           <option value="non_warranty">Non-Warranty</option>
                         </select>
+                      </div>
+                      <div><label className={labelClass}>Serial Number</label>
+                        <input
+                          type="text"
+                          value={form.serial_number}
+                          onChange={(e) => setForm({ ...form, serial_number: e.target.value })}
+                          placeholder="e.g. SN-098234"
+                          className={inputClass}
+                        />
                       </div>
                     </div>
                   </div>
@@ -981,6 +1049,7 @@ const Complaints = () => {
                 </div>
                 <div><label className={labelClass}>Resolution Expected</label><p className="text-sm font-semibold text-primary">{viewComplaint.resolution_time || "48 Hours"}</p></div>
                 <div><label className={labelClass}>Verification ID</label><p className="text-sm font-mono font-bold text-emerald-600">{viewComplaint.verification_id || "—"}</p></div>
+                <div><label className={labelClass}>Serial Number</label><p className="text-sm font-semibold font-mono">{viewComplaint.serial_number || "—"}</p></div>
                 <div><label className={labelClass}>Warranty</label><p className="text-xs font-bold uppercase text-muted-foreground">{viewComplaint.warranty_type.replace('_', ' ')}</p></div>
               </div>
             </div>
