@@ -28,7 +28,8 @@ export const generateAppointmentLetter = async (data: any) => {
         });
         if (res.ok) {
             const settingsData = await res.json();
-            if (settingsData) settings = { ...settings, ...settingsData };
+            const comp = Array.isArray(settingsData) ? settingsData[0] : settingsData;
+            if (comp) settings = { ...settings, ...comp };
         }
     } catch (err) {
         console.error("Error fetching company settings:", err);
@@ -59,7 +60,7 @@ export const generateAppointmentLetter = async (data: any) => {
         doc.setFontSize(8);
         doc.setFont("helvetica", "normal");
         doc.setTextColor(100);
-        doc.text("Head Office: 1st Floor, Zain Plaza, Islamabad | Tel: +92 310 1111 327 | Email: ecs.isbpak@gmail.com", pageWidth / 2, footerY, { align: "center" });
+        doc.text(`Head Office: ${settings.company_address || '1st Floor, Zain Plaza, Islamabad'} | Tel: ${settings.company_phone || '+92 310 1111 327'} | Email: ${settings.company_email || 'ecs.isbpak@gmail.com'}`, pageWidth / 2, footerY, { align: "center" });
         doc.setTextColor(100);
         doc.text("This Software is Developed by Devionic ( Private ) Limited | +92-317-7121841 | devionic.com", pageWidth / 2, footerY + 5, { align: "center" });
         doc.setTextColor(150);

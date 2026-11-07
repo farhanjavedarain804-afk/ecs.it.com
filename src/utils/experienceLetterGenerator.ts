@@ -28,12 +28,13 @@ export const generateExperienceLetter = async (data: any) => {
         });
         if (res.ok) {
             const settingsData = await res.json();
-            if (settingsData) {
+            const comp = Array.isArray(settingsData) ? settingsData[0] : settingsData;
+            if (comp) {
                 settings = { 
                     ...settings, 
-                    ...settingsData,
-                    authorized_signatory: 'Muhammad Aamir', // User specifically requested this name
-                    signatory_designation: 'Chief Executive Officer'
+                    ...comp,
+                    authorized_signatory: comp.authorized_signatory || 'Muhammad Aamir',
+                    signatory_designation: comp.signatory_designation || 'Chief Executive Officer'
                 };
             }
         }
@@ -65,7 +66,7 @@ export const generateExperienceLetter = async (data: any) => {
         doc.setFontSize(8);
         doc.setFont("helvetica", "normal");
         doc.setTextColor(100);
-        doc.text("Head Office: 1st Floor, Zain Plaza, Islamabad | Tel: +92 310 1111 327 | Email: ecs.isbpak@gmail.com", pageWidth / 2, footerY, { align: "center" });
+        doc.text(`Head Office: ${settings.company_address || '1st Floor, Zain Plaza, Islamabad'} | Tel: ${settings.company_phone || '+92 310 1111 327'} | Email: ${settings.company_email || 'ecs.isbpak@gmail.com'}`, pageWidth / 2, footerY, { align: "center" });
         doc.setTextColor(100);
         doc.text("This Software is Developed by Devionic ( Private ) Limited | +92-317-7121841 | devionic.com", pageWidth / 2, footerY + 5, { align: "center" });
         doc.setTextColor(150);

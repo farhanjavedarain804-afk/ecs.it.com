@@ -3,6 +3,7 @@ const router = express.Router();
 const pool = require('../config/db');
 const auth = require('../middleware/auth');
 const emailService = require('../utils/emailService');
+const bankService = require('../utils/bankService');
 
 // @route   GET /api/invoices
 router.get('/', auth(), async (req, res) => {
@@ -103,6 +104,13 @@ router.get('/:id', auth(), async (req, res) => {
         const [rows] = await pool.query(query, [id]);
         if (rows.length === 0) return res.status(404).json({ error: 'Invoice not found' });
         const row = rows[0];
+
+        // Resolve branch-specific bank account (or default account)
+        try {
+            row.bank_account = await bankService.getBankAccountForBranch(pool, row.branch_id);
+        } catch (bErr) {
+            console.error('[Invoice] Failed to resolve branch bank account:', bErr.message);
+        }
 
         // Priority 1: Fetch items from the invoice_items table
         let [items] = await pool.query('SELECT * FROM invoice_items WHERE invoice_id = ?', [id]);

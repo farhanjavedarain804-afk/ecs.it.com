@@ -39,7 +39,10 @@ export const generatePDF = async (type: 'welcome_note' | 'complaint_receipt' | '
         });
         if (res.ok) {
             const data = await res.json();
-            if (data) settings = { ...settings, ...data };
+            if (data) {
+                const comp = Array.isArray(data) ? data[0] : data;
+                if (comp) settings = { ...settings, ...comp };
+            }
         }
     } catch (err) {
         console.error("Error fetching company settings:", err);
@@ -305,7 +308,12 @@ export const generatePDF = async (type: 'welcome_note' | 'complaint_receipt' | '
         doc.setFont("helvetica", "normal");
         doc.setFontSize(9);
         doc.text(String(data.customer_name || 'Valued Customer'), 15, y);
-        doc.text(`Bank: ${settings.bank_name}`, pageWidth / 2 + 10, y);
+        const bankAccount = data.bank_account || data.branches?.bank_account || {
+            bank_name: settings.bank_name,
+            account_title: settings.account_title,
+            iban: settings.iban
+        };
+        doc.text(`Bank: ${bankAccount.bank_name || settings.bank_name}`, pageWidth / 2 + 10, y);
 
         y += 5;
         const address = String(data.customers?.address || data.address || '');
@@ -313,11 +321,11 @@ export const generatePDF = async (type: 'welcome_note' | 'complaint_receipt' | '
         const fullAddress = city ? `${address}${address ? ', ' : ''}${city}` : address;
         const addrLines = doc.splitTextToSize(fullAddress, 80);
         doc.text(addrLines[0] || '', 15, y);
-        doc.text(`A/C Title: ${settings.account_title}`, pageWidth / 2 + 10, y);
+        doc.text(`A/C Title: ${bankAccount.account_title || settings.account_title}`, pageWidth / 2 + 10, y);
 
         y += 5;
         doc.text(addrLines[1] || '', 15, y);
-        doc.text(`Account/IBAN: ${settings.iban}`, pageWidth / 2 + 10, y);
+        doc.text(`Account/IBAN: ${bankAccount.iban || bankAccount.account_number || settings.iban}`, pageWidth / 2 + 10, y);
 
         y += 5;
         doc.text(`Ph: ${data.customers?.phone || data.phone || 'N/A'}`, 15, y);
@@ -406,7 +414,7 @@ export const generatePDF = async (type: 'welcome_note' | 'complaint_receipt' | '
         doc.setFontSize(8);
         doc.setFont("helvetica", "normal");
         doc.setTextColor(100);
-        doc.text("Head Office: 1st Floor, Zain Plaza, Islamabad | Tel: +92 310 1111 327 | Email: ecs.isbpak@gmail.com", pageWidth / 2, y, { align: "center" });
+        doc.text(`Head Office: ${settings.company_address || '1st Floor, Zain Plaza, Islamabad'} | Tel: ${settings.company_phone || '+92 310 1111 327'} | Email: ${settings.company_email || 'ecs.isbpak@gmail.com'}`, pageWidth / 2, y, { align: "center" });
 
         y += 6;
         doc.setFontSize(8);
@@ -636,7 +644,7 @@ export const generatePDF = async (type: 'welcome_note' | 'complaint_receipt' | '
         doc.setFontSize(8);
         doc.setFont("helvetica", "normal");
         doc.setTextColor(100);
-        doc.text("Head Office: 1st Floor, Zain Plaza, Islamabad | Tel: +92 310 1111 327 | Email: ecs.isbpak@gmail.com", pageWidth / 2, y, { align: "center" });
+        doc.text(`Head Office: ${settings.company_address || '1st Floor, Zain Plaza, Islamabad'} | Tel: ${settings.company_phone || '+92 310 1111 327'} | Email: ${settings.company_email || 'ecs.isbpak@gmail.com'}`, pageWidth / 2, y, { align: "center" });
         
         y += 4.5;
         doc.setTextColor(100);
@@ -915,7 +923,10 @@ export const exportTableToPDF = async (title: string, headers: string[], rows: a
         });
         if (res.ok) {
             const data = await res.json();
-            if (data) settings = { ...settings, ...data };
+            if (data) {
+                const comp = Array.isArray(data) ? data[0] : data;
+                if (comp) settings = { ...settings, ...comp };
+            }
         }
     } catch (err) {
         console.error("Error fetching company settings:", err);

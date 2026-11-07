@@ -1,5 +1,6 @@
 const nodemailer = require('nodemailer');
 const pool = require('../config/db');
+const bankService = require('./bankService');
 
 // Ensure settings table exists
 const ensureSettingsTable = async () => {
@@ -36,7 +37,7 @@ const getSmtpSettings = async () => {
 };
 
 // Retrieve Company Profile and Contact Numbers (same as on PDF invoices)
-const getCompanyInfo = async () => {
+const getCompanyInfo = async (branchId = null) => {
     let company = {
         name: 'Electric Complaint Solutions',
         phone: '+92 310 1111 327',
@@ -45,10 +46,26 @@ const getCompanyInfo = async () => {
         bank_name: 'Habib Bank Limited',
         account_title: 'ECS (PVT) Ltd',
         iban: '0050417901614255',
+        account_number: '0050417901614255',
         tax_id: '3220139033321',
         terms: 'Payment is due within 7 days. Thank you for your business.'
     };
 
+    // 1. Sync from settings table (company_profile) for real-time contact updates
+    try {
+        const [setRows] = await pool.query("SELECT value FROM settings WHERE `key` = 'company_profile'");
+        if (setRows.length > 0 && setRows[0].value) {
+            const setVal = typeof setRows[0].value === 'string' ? JSON.parse(setRows[0].value) : setRows[0].value;
+            if (setVal.company_name) company.name = setVal.company_name;
+            if (setVal.company_phone) company.phone = setVal.company_phone;
+            if (setVal.company_email) company.email = setVal.company_email;
+            if (setVal.company_address) company.address = setVal.company_address;
+            if (setVal.tax_id) company.tax_id = setVal.tax_id;
+            if (setVal.terms_and_conditions) company.terms = setVal.terms_and_conditions;
+        }
+    } catch (e) {}
+
+    // 2. Overlay with company_settings table
     try {
         const [rows] = await pool.query("SELECT * FROM company_settings LIMIT 1");
         if (rows.length > 0 && rows[0]) {
@@ -60,11 +77,25 @@ const getCompanyInfo = async () => {
             if (r.bank_name) company.bank_name = r.bank_name;
             if (r.account_title) company.account_title = r.account_title;
             if (r.iban) company.iban = r.iban;
+            if (r.account_number) company.account_number = r.account_number;
             if (r.tax_id) company.tax_id = r.tax_id;
             if (r.terms_and_conditions) company.terms = r.terms_and_conditions;
         }
     } catch (e) {
         console.error('[EmailService] Error fetching company settings:', e.message);
+    }
+
+    // 3. Resolve branch-specific bank account (or default bank account)
+    try {
+        const branchBank = await bankService.getBankAccountForBranch(pool, branchId);
+        if (branchBank) {
+            if (branchBank.bank_name) company.bank_name = branchBank.bank_name;
+            if (branchBank.account_title) company.account_title = branchBank.account_title;
+            if (branchBank.iban) company.iban = branchBank.iban;
+            if (branchBank.account_number) company.account_number = branchBank.account_number;
+        }
+    } catch (bErr) {
+        console.error('[EmailService] Error resolving branch bank:', bErr.message);
     }
 
     return company;
@@ -235,7 +266,7 @@ const sendComplaintCreatedEmail = async (complaint, customer, branch) => {
         const toEmail = customer?.email || complaint?.customer_email;
         if (!toEmail) return;
 
-        const company = await getCompanyInfo();
+        const company = await getCompanyInfo(branch?.id || complaint?.branch_id);
         const branchName = branch?.name || complaint?.branch_name || 'Main Branch';
 
         const bodyContent = `
@@ -286,7 +317,7 @@ const sendComplaintStatusEmail = async (complaint, customer, newStatus, notes = 
         const toEmail = customer?.email || complaint?.customer_email;
         if (!toEmail) return;
 
-        const company = await getCompanyInfo();
+        const company = await getCompanyInfo(complaint?.branch_id);
         const formattedStatus = (newStatus || complaint.status || 'updated').replace(/_/g, ' ');
 
         let badgeClass = 'badge-primary';
@@ -339,7 +370,7 @@ const sendInvoiceEmail = async (invoice, customer, items = [], branch = null, pd
         const toEmail = customer?.email || invoice?.customer_email;
         if (!toEmail) return;
 
-        const company = await getCompanyInfo();
+        const company = await getCompanyInfo(branch?.id || invoice?.branch_id);
         const branchName = branch?.name || invoice?.branch_name || 'Main Branch';
 
         const totalFormatted = parseFloat(invoice.total_amount || 0).toLocaleString('en-PK', { minimumFractionDigits: 2 });
@@ -449,7 +480,7 @@ const testSmtpConnection = async (smtpConfig, testRecipient) => {
     await transporter.verify();
 
     if (testRecipient && testRecipient.includes('@')) {
-        const company = await getCompanyInfo();
+        const company = await getCompanyInfo(branch?.id || invoice?.branch_id);
         const testHtml = buildEmailTemplate(
             company,
             'SMTP Configuration Test',
