@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const pool = require('../config/db');
 const auth = require('../middleware/auth');
+const emailService = require('../utils/emailService');
 
 // @route   GET /api/customers
 // @desc    Get all customers or search
@@ -99,6 +100,13 @@ router.post('/', auth(), async (req, res) => {
             'INSERT INTO customers (id, customer_id, name, phone, email, address, city, branch_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
             [id, customer_id, name, phone, email, address, city, finalBranchId]
         );
+
+        // Automatic Welcome Email (non-blocking)
+        if (email) {
+            emailService.sendWelcomeEmail({ id, customer_id, name, phone, email, address, city }).catch(e => {
+                console.error('[Customers] Welcome email background error:', e.message);
+            });
+        }
 
         res.status(201).json({ id, customer_id, name });
     } catch (err) {

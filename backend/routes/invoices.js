@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const pool = require('../config/db');
 const auth = require('../middleware/auth');
+const emailService = require('../utils/emailService');
 
 // @route   GET /api/invoices
 router.get('/', auth(), async (req, res) => {
@@ -9,7 +10,7 @@ router.get('/', auth(), async (req, res) => {
         const { branch_id, status, customer_id } = req.query;
         let query = `
             SELECT i.*, 
-                   c.name as customer_name, c.address as customer_address, c.phone as customer_phone, c.city as customer_city,
+                   c.name as customer_name, c.address as customer_address, c.phone as customer_phone, c.email as customer_email, c.city as customer_city,
                    b.name as branch_name, b.address as branch_address, b.branch_code, b.city as branch_city,
                    comp.complaint_number, s.full_name as technician_name 
             FROM invoices i 
@@ -70,7 +71,7 @@ router.get('/', auth(), async (req, res) => {
         const [rows] = await pool.query(query, params);
         const results = rows.map(row => ({
             ...row,
-            customers: { id: row.customer_id, name: row.customer_name, address: row.customer_address, phone: row.customer_phone, city: row.customer_city || row.branch_city || '' },
+            customers: { id: row.customer_id, name: row.customer_name, address: row.customer_address, phone: row.customer_phone, email: row.customer_email, city: row.customer_city || row.branch_city || '' },
             branches: { id: row.branch_id, name: row.branch_name, address: row.branch_address, branch_code: row.branch_code, city: row.branch_city },
             complaints: row.complaint_id ? { id: row.complaint_id, complaint_number: row.complaint_number } : null,
             staff: row.technician_id ? { id: row.technician_id, full_name: row.technician_name } : null
@@ -88,7 +89,7 @@ router.get('/:id', auth(), async (req, res) => {
         const { id } = req.params;
         const query = `
             SELECT i.*, 
-                   c.name as customer_name, c.address as customer_address, c.phone as customer_phone, c.city as customer_city,
+                   c.name as customer_name, c.address as customer_address, c.phone as customer_phone, c.email as customer_email, c.city as customer_city,
                    b.name as branch_name, b.address as branch_address, b.branch_code, b.city as branch_city,
                    comp.complaint_number, comp.description as complaint_description, comp.complaint_type,
                    s.full_name as technician_name 
@@ -101,31 +102,16 @@ router.get('/:id', auth(), async (req, res) => {
         `;
         const [rows] = await pool.query(query, [id]);
         if (rows.length === 0) return res.status(404).json({ error: 'Invoice not found' });
-
         const row = rows[0];
 
-        // Priority 1: Fetch items from invoice_items table (new invoices)
-        const [itemRows] = await pool.query('SELECT * FROM invoice_items WHERE invoice_id = ?', [id]);
-        let items = itemRows.map(it => ({
-            ...it,
-            qty: parseFloat(it.quantity),
-            unitPrice: parseFloat(it.unit_price)
-        }));
+        // Priority 1: Fetch items from the invoice_items table
+        let [items] = await pool.query('SELECT * FROM invoice_items WHERE invoice_id = ?', [id]);
 
-        // Priority 2: If invoice_items is empty, read from invoices.items JSON column (old invoices stored items here)
+        // Priority 2: Fallback to JSON column if invoice_items table has no rows
         if (items.length === 0 && row.items) {
             try {
-                const jsonItems = typeof row.items === 'string' ? JSON.parse(row.items) : row.items;
-                if (Array.isArray(jsonItems) && jsonItems.length > 0) {
-                    items = jsonItems.map(it => ({
-                        ...it,
-                        id: it.id || null,
-                        description: it.description || it.name || it.service_name || it.product_name || it.item_name || it.title || '',
-                        qty: parseFloat(it.qty || it.quantity || 1),
-                        unitPrice: parseFloat(it.unitPrice || it.unit_price || it.price || it.rate || 0),
-                        total_price: parseFloat(it.total_price || it.amount || 0)
-                    })).filter(it => it.description);
-                }
+                const parsed = typeof row.items === 'string' ? JSON.parse(row.items) : row.items;
+                if (Array.isArray(parsed) && parsed.length > 0) items = parsed;
             } catch (e) {
                 console.error('[Invoice] Failed to parse items JSON column:', e.message);
             }
@@ -133,7 +119,6 @@ router.get('/:id', auth(), async (req, res) => {
 
         // Priority 3: Last resort — synthesize a single line from subtotal + available description fields
         if (items.length === 0 && (parseFloat(row.subtotal) || 0) > 0) {
-            // Build best available description from: notes → complaint description → complaint type
             let desc = '';
             if (row.notes && row.notes.trim()) {
                 desc = row.notes.replace(/^Complaint Description:\s*/i, '').trim().substring(0, 150);
@@ -160,7 +145,7 @@ router.get('/:id', auth(), async (req, res) => {
         const result = {
             ...row,
             items,
-            customers: { id: row.customer_id, name: row.customer_name, address: row.customer_address, phone: row.customer_phone },
+            customers: { id: row.customer_id, name: row.customer_name, address: row.customer_address, phone: row.customer_phone, email: row.customer_email },
             branches: { id: row.branch_id, name: row.branch_name, address: row.branch_address, branch_code: row.branch_code },
             complaints: row.complaint_id ? { id: row.complaint_id, complaint_number: row.complaint_number } : null,
             staff: row.technician_id ? { id: row.technician_id, full_name: row.technician_name } : null
@@ -211,7 +196,7 @@ router.post('/', auth(), async (req, res) => {
             ]
         );
 
-        for (const item of items) {
+        for (const item of (items || [])) {
             const itemId = require('crypto').randomUUID();
             const qty = parseFloat(item.qty || item.quantity) || 0;
             const up = parseFloat(item.unitPrice || item.unit_price) || 0;
@@ -228,6 +213,23 @@ router.post('/', auth(), async (req, res) => {
             await connection.query('UPDATE complaints SET status = "invoice_generated" WHERE id = ?', [complaint_id]);
         }
         await connection.commit();
+
+        // Send automatic Invoice Email (non-blocking)
+        try {
+            const [custRows] = await pool.query('SELECT name, email, phone FROM customers WHERE id = ?', [customer_id]);
+            const [brRows] = await pool.query('SELECT name, address, branch_code FROM branches WHERE id = ?', [finalBranchId]);
+            if (custRows.length > 0 && custRows[0].email) {
+                emailService.sendInvoiceEmail(
+                    { id: invoiceId, invoice_number: invoiceNumber, verification_id: verificationId, total_amount, subtotal, tax_amount, discount_amount, payment_status: 'unpaid', due_date, notes },
+                    custRows[0],
+                    items || [],
+                    brRows[0] || null
+                ).catch(e => console.error('[Invoices] Automatic invoice email error:', e.message));
+            }
+        } catch (e) {
+            console.error('[Invoices] Error preparing automatic invoice email:', e.message);
+        }
+
         res.status(201).json({ id: invoiceId, invoice_number: invoiceNumber });
     } catch (err) {
         await connection.rollback();
@@ -235,6 +237,50 @@ router.post('/', auth(), async (req, res) => {
         res.status(500).json({ error: err.message || 'Server error' });
     } finally {
         connection.release();
+    }
+});
+
+// @route   POST /api/invoices/:id/send_email
+// @desc    Send / resend invoice email to customer
+router.post('/:id/send_email', auth(), async (req, res) => {
+    try {
+        const { id } = req.params;
+        const [invRows] = await pool.query(`
+            SELECT i.*, 
+                   c.name as customer_name, c.email as customer_email, c.phone as customer_phone, c.address as customer_address,
+                   b.name as branch_name, b.address as branch_address, b.branch_code
+            FROM invoices i
+            JOIN customers c ON i.customer_id = c.id
+            JOIN branches b ON i.branch_id = b.id
+            WHERE i.id = ?
+        `, [id]);
+
+        if (invRows.length === 0) {
+            return res.status(404).json({ error: 'Invoice not found' });
+        }
+
+        const inv = invRows[0];
+        if (!inv.customer_email) {
+            return res.status(400).json({ error: 'Customer does not have an email address on file.' });
+        }
+
+        const [items] = await pool.query('SELECT * FROM invoice_items WHERE invoice_id = ?', [id]);
+
+        const result = await emailService.sendInvoiceEmail(
+            inv,
+            { name: inv.customer_name, email: inv.customer_email, phone: inv.customer_phone },
+            items,
+            { name: inv.branch_name, address: inv.branch_address, branch_code: inv.branch_code }
+        );
+
+        if (result && result.success === false) {
+            return res.status(500).json({ error: result.error || 'Failed to send invoice email' });
+        }
+
+        res.json({ success: true, message: `Invoice emailed to ${inv.customer_email}` });
+    } catch (err) {
+        console.error('[Invoice Email Error]:', err);
+        res.status(500).json({ error: err.message || 'Server error' });
     }
 });
 

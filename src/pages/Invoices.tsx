@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
-import { Plus, Search, FileText, Calendar, AlertCircle, CheckCircle2, Clock, FileDown, Trash2, PlusCircle, Lock, Check, ChevronsUpDown, Edit2, X } from "lucide-react";
+import { Plus, Search, FileText, Calendar, AlertCircle, CheckCircle2, Clock, FileDown, Trash2, PlusCircle, Lock, Check, ChevronsUpDown, Edit2, X, Mail } from "lucide-react";
 import { logActivity } from "@/utils/logger";
 import { generatePDF } from "@/utils/pdfGenerator";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
@@ -24,6 +24,7 @@ const Invoices = () => {
   const [editingItemsInvoice, setEditingItemsInvoice] = useState<any | null>(null);
   const [editItemsForm, setEditItemsForm] = useState<{ items: any[], sales_tax_rate: string, shipping_handling: string, discount_amount: string, advance_paid: string }>({ items: [{ description: "", qty: 1, unitPrice: 0 }], sales_tax_rate: "0", shipping_handling: "0", discount_amount: "0", advance_paid: "0" });
   const [savingItems, setSavingItems] = useState(false);
+  const [sendingEmailId, setSendingEmailId] = useState<string | null>(null);
   const { user, hasRole, profile, session, isDeveloper } = useAuth();
   const { toast } = useToast();
 
@@ -378,6 +379,30 @@ const Invoices = () => {
       });
     } catch (err: any) {
       toast({ title: "PDF Error", description: err.message, variant: "destructive" });
+    }
+  };
+
+  const handleSendInvoiceEmail = async (inv: any) => {
+    setSendingEmailId(inv.id);
+    toast({ title: "Sending Invoice Email...", description: `Sending invoice #${inv.invoice_number || ''} to customer...` });
+    try {
+      const API_URL = import.meta.env.VITE_API_URL ?? '';
+      const res = await fetch(`${API_URL}/api/invoices/${inv.id}/send_email`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${session?.access_token || localStorage.getItem('ecs_token')}`,
+          'Content-Type': 'application/json'
+        }
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.error || "Failed to send invoice email");
+      }
+      toast({ title: "Email Sent Successfully! 📧", description: `Invoice sent to ${data.recipient || "customer"}` });
+    } catch (err: any) {
+      toast({ title: "Failed to Send Email", description: err.message, variant: "destructive" });
+    } finally {
+      setSendingEmailId(null);
     }
   };
 
@@ -867,6 +892,14 @@ const Invoices = () => {
                           title="Download Invoice PDF"
                         >
                           <FileDown className="w-4 h-4" />
+                        </button>
+                        <button
+                          onClick={() => handleSendInvoiceEmail(inv)}
+                          disabled={sendingEmailId === inv.id}
+                          className="p-2 rounded-lg bg-blue-100 text-blue-700 hover:bg-blue-600 hover:text-white transition-all shadow-sm active:scale-95 disabled:opacity-50"
+                          title="Email Invoice to Customer"
+                        >
+                          <Mail className={`w-4 h-4 ${sendingEmailId === inv.id ? "animate-pulse" : ""}`} />
                         </button>
                         <button
                           onClick={() => openEditItems(inv)}

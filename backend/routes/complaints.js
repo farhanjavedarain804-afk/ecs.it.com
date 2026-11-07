@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const pool = require('../config/db');
 const auth = require('../middleware/auth');
+const emailService = require('../utils/emailService');
 
 // @route   GET /api/complaints
 router.get('/', auth(), async (req, res) => {
@@ -154,6 +155,22 @@ router.post('/', auth(), async (req, res) => {
             'INSERT INTO complaints (id, complaint_number, verification_id, customer_id, branch_id, complaint_type, priority, status, description, notes, warranty_type, assigned_to, assigned_helper, attachments, serial_number) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
             [id, complaintNumber, verificationId, customer_id, branch_id, complaint_type, priority, 'registered', description, notes, warranty_type || 'non_warranty', assigned_to || null, assigned_helper || null, finalAttachments, serial_number || null]
         );
+
+        // Send automatic Complaint Registration Email (non-blocking)
+        try {
+            const [custRows] = await pool.query('SELECT name, email, phone FROM customers WHERE id = ?', [customer_id]);
+            const [brRows] = await pool.query('SELECT name FROM branches WHERE id = ?', [branch_id]);
+            if (custRows.length > 0 && custRows[0].email) {
+                emailService.sendComplaintCreatedEmail(
+                    { complaint_number: complaintNumber, verification_id: verificationId, complaint_type, priority, description, serial_number, warranty_type },
+                    custRows[0],
+                    brRows[0] || null
+                ).catch(e => console.error('[Complaints] Email notification error:', e.message));
+            }
+        } catch (e) {
+            console.error('[Complaints] Error preparing complaint creation email:', e.message);
+        }
+
         res.status(201).json({ id, complaint_number: complaintNumber, verification_id: verificationId, serial_number });
     } catch (err) {
         console.error('Complaint Creation Error:', err);
@@ -199,6 +216,29 @@ router.patch('/:id', auth(), async (req, res) => {
         const values = [...Object.values(updates), id];
 
         await pool.query(`UPDATE complaints SET ${fields} WHERE id = ?`, values);
+
+        // If status was changed, send automatic Status Update Email (non-blocking)
+        if (updates.status && updates.status !== current[0].status) {
+            try {
+                const [compData] = await pool.query(`
+                    SELECT c.complaint_number, c.verification_id, c.status, cust.name, cust.email 
+                    FROM complaints c 
+                    JOIN customers cust ON c.customer_id = cust.id 
+                    WHERE c.id = ?
+                `, [id]);
+                if (compData.length > 0 && compData[0].email) {
+                    emailService.sendComplaintStatusEmail(
+                        compData[0],
+                        { name: compData[0].name, email: compData[0].email },
+                        updates.status,
+                        updates.notes || null
+                    ).catch(e => console.error('[Complaints] Status email notification error:', e.message));
+                }
+            } catch (e) {
+                console.error('[Complaints] Error preparing status update email:', e.message);
+            }
+        }
+
         res.json({ message: 'Complaint updated' });
     } catch (err) {
         console.error('Complaint Update Error:', err);
