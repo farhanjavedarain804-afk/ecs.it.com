@@ -148,7 +148,7 @@ const Branches = () => {
         totalStaff: staffData.length,
         totalSalaries,
         expenses: otherExpenses,
-        profitLoss: totalRevenue - (totalSalaries + otherExpenses)
+        profitLoss: totalRevenue - otherExpenses // Salaries are paid solely by Head Office, not deducted from branch balance
       });
     } catch (err) {
       console.error(err);
@@ -664,7 +664,7 @@ const Branches = () => {
                     <div className={`text-xl font-bold ${stats.profitLoss >= 0 ? "text-success" : "text-destructive"}`}>
                       Rs. {stats.profitLoss.toLocaleString()}
                     </div>
-                    <div className="text-[10px] text-muted-foreground mt-1">Rev - Salaries</div>
+                    <div className="text-[10px] text-muted-foreground mt-1">Branch Profit (Salaries Paid by HO)</div>
                   </div>
 
                   {/* Activity */}

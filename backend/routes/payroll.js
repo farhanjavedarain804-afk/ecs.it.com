@@ -192,14 +192,13 @@ router.patch('/pay/:id', auth(['super_admin']), async (req, res) => {
             [id]
         );
 
-        // 3. Record in branch_settlements (Deducted from HO)
+        // 3. Record in branch_settlements (Deducted strictly from Head Office, NOT branch)
         const settlementId = crypto.randomUUID();
         await connection.query(
             `INSERT INTO branch_settlements (id, from_branch_id, to_branch_id, amount, transfer_type, description, created_by, reference_id)
-             VALUES (?, NULL, ?, ?, 'Salary', ?, ?, ?)`,
+             VALUES (?, NULL, NULL, ?, 'Salary', ?, ?, ?)`,
             [
                 settlementId, 
-                slip.branch_id, 
                 slip.net_salary, 
                 `Salary Settlement (Auto-Entry): ${slip.full_name}`, 
                 req.user.id,
@@ -408,13 +407,12 @@ router.patch('/advance/:id/pay', auth(['super_admin', 'developer']), async (req,
             [id]
         );
 
-        // 3. Record in branch_settlements (Deducted from HO)
+        // 3. Record in branch_settlements (Deducted strictly from Head Office, NOT branch)
         await connection.query(
             `INSERT INTO branch_settlements (id, from_branch_id, to_branch_id, amount, transfer_type, description, created_by, reference_id)
-             VALUES (?, NULL, ?, ?, 'Salary', ?, ?, ?)`,
+             VALUES (?, NULL, NULL, ?, 'Salary', ?, ?, ?)`,
             [
                 crypto.randomUUID(), 
-                adv.branch_id, 
                 adv.amount, 
                 `Salary Advance Payout: ${adv.full_name}`, 
                 req.user.id,

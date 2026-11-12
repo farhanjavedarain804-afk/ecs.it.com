@@ -216,10 +216,14 @@ router.get('/', auth(), async (req, res) => {
                 ratio: complaintsAll.length > 0 ? (resolved / complaintsAll.length) * 100 : 0
             },
             financials: {
-                totalRevenue, totalExpenses: totalExpenses + totalSalaries,
-                netProfit: totalRevenue - totalExpenses - totalSalaries,
-                collectedInv: invoiceRevenue, outstandingInv: unpaidAmount,
-                otherIncome, otherExpenses: totalExpenses, salaries: totalSalaries
+                totalRevenue, 
+                totalExpenses: branch_id ? totalExpenses : (totalExpenses + totalSalaries),
+                netProfit: branch_id ? (totalRevenue - totalExpenses) : (totalRevenue - totalExpenses - totalSalaries),
+                collectedInv: invoiceRevenue, 
+                outstandingInv: unpaidAmount,
+                otherIncome, 
+                otherExpenses: totalExpenses, 
+                salaries: totalSalaries
             },
             satisfaction: {
                 avg: reviewsAll.length > 0 ? (reviewsAll.filter(r => !r.refused_ratings).reduce((s, r) => {

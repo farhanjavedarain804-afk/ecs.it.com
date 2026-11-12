@@ -42,6 +42,8 @@ const crypto = require('crypto');
 
         // Migration: Ensure transfer_type ENUM is updated
         await connection.query("ALTER TABLE branch_settlements MODIFY COLUMN transfer_type ENUM('HO-to-Branch', 'Branch-to-HO', 'Branch-to-Branch', 'Salary', 'Profit-Settlement') NOT NULL");
+        // Migration: Ensure past Salary settlements do not link to branch
+        await connection.query("UPDATE branch_settlements SET to_branch_id = NULL WHERE transfer_type = 'Salary' AND to_branch_id IS NOT NULL");
 
         connection.release();
     } catch (err) {
@@ -113,13 +115,13 @@ async function getBranchStats(branchId) {
 
     // 4. Incoming Transfers (to_branch_id = ?)
     const [incRes] = await pool.query(
-        "SELECT SUM(amount) as total FROM branch_settlements WHERE to_branch_id = ?",
+        "SELECT SUM(amount) as total FROM branch_settlements WHERE to_branch_id = ? AND transfer_type != 'Salary'",
         [branchId]
     );
 
     // 5. Outgoing Transfers (from_branch_id = ?)
     const [outRes] = await pool.query(
-        "SELECT SUM(amount) as total FROM branch_settlements WHERE from_branch_id = ?",
+        "SELECT SUM(amount) as total FROM branch_settlements WHERE from_branch_id = ? AND transfer_type != 'Salary'",
         [branchId]
     );
 
@@ -174,7 +176,8 @@ router.get('/history', auth(), async (req, res) => {
         let query = `
             (SELECT bs.id, bs.from_branch_id, bs.to_branch_id, bs.amount, bs.transfer_type, 
                    bs.description, bs.reference_id, bs.created_at, p.full_name as creator_name,
-                   fb.name as from_branch_name, tb.name as to_branch_name
+                   COALESCE(fb.name, 'Head Office') as from_branch_name,
+                   COALESCE(tb.name, IF(bs.transfer_type = 'Salary', 'Staff Payroll', 'Head Office')) as to_branch_name
             FROM branch_settlements bs
             LEFT JOIN branches fb ON bs.from_branch_id = fb.id
             LEFT JOIN branches tb ON bs.to_branch_id = tb.id
