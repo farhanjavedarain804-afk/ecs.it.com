@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useToast } from "@/hooks/use-toast";
 import { useRef } from "react";
-import { Plus, Search, Edit2, Clock, CheckCircle2, AlertTriangle, XCircle, FileDown, Paperclip, ImageIcon, Filter, FileText, Upload, Trash2, Lock, Phone, Mail, MapPin, ExternalLink, Printer, History, Calendar, User, Wrench, Shield, Copy, Check, Hash, ArrowUpRight } from "lucide-react";
+import { Plus, Search, Edit2, Clock, CheckCircle2, AlertTriangle, XCircle, FileDown, Paperclip, ImageIcon, Filter, FileText, Upload, Trash2, Lock, Phone, Mail, MapPin, ExternalLink, Printer, History, Calendar, User, Wrench, Shield, Copy, Check, Hash, ArrowUpRight, Users, UserPlus, Building2, Sparkles } from "lucide-react";
 import { generatePDF, exportTableToPDF } from "@/utils/pdfGenerator";
 import { logActivity } from "@/utils/logger";
 
@@ -790,82 +790,166 @@ const Complaints = () => {
 
       {/* Modern Form Modal */}
       {showForm && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-foreground/30 backdrop-blur-sm p-4 animate-in fade-in duration-200">
-          <div className="w-full max-w-3xl rounded-3xl bg-card border border-border p-8 shadow-elevated max-h-[90vh] overflow-y-auto">
-            <div className="flex items-center justify-between mb-8">
-              <div>
-                <h3 className="text-2xl font-bold font-display text-card-foreground">{editingId ? "Update Record" : "Register Complaint"}</h3>
-                <p className="text-sm text-muted-foreground">Fill in the details for service registration.</p>
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-foreground/40 backdrop-blur-md p-3 sm:p-6 animate-in fade-in duration-200">
+          <div className="w-full max-w-4xl rounded-3xl bg-card border border-border shadow-2xl overflow-hidden flex flex-col max-h-[92vh]">
+            
+            {/* Modal Header */}
+            <div className="px-6 sm:px-8 py-5 border-b border-border bg-gradient-to-r from-primary/10 via-card to-muted/40 flex items-center justify-between gap-4 shrink-0">
+              <div className="flex items-center gap-3.5">
+                <div className="w-11 h-11 rounded-2xl bg-primary text-primary-foreground flex items-center justify-center shadow-md shadow-primary/25">
+                  {editingId ? <Edit2 className="w-5 h-5" /> : <Plus className="w-5 h-5" />}
+                </div>
+                <div>
+                  <h3 className="text-xl sm:text-2xl font-black font-display text-foreground tracking-tight">
+                    {editingId ? "Update Complaint Record" : "Register New Complaint"}
+                  </h3>
+                  <p className="text-xs text-muted-foreground mt-0.5">
+                    {editingId ? "Modify existing complaint details and assignments." : "Capture customer details, machine specifications, and allocate technicians."}
+                  </p>
+                </div>
               </div>
-              <button onClick={resetForm} className="p-2 rounded-xl hover:bg-muted text-muted-foreground transition-colors"><XCircle className="w-6 h-6" /></button>
+              <button
+                type="button"
+                onClick={resetForm}
+                className="p-2.5 rounded-xl hover:bg-muted text-muted-foreground hover:text-foreground transition-colors"
+                title="Close"
+              >
+                <XCircle className="w-6 h-6" />
+              </button>
             </div>
 
-            <form onSubmit={handleSubmit} className="space-y-8">
-              {!editingId && (
-                <div className="bg-muted/30 p-1.5 rounded-2xl flex gap-1.5">
-                  <button type="button" onClick={() => setCustomerType("old")}
-                    className={`flex-1 py-3.5 rounded-xl text-sm font-bold transition-all ${customerType === "old" ? "bg-card text-foreground shadow-sm" : "text-muted-foreground hover:bg-muted/50"}`}>
-                    Search Existing
-                  </button>
-                  <button type="button" onClick={() => setCustomerType("new")}
-                    className={`flex-1 py-3.5 rounded-xl text-sm font-bold transition-all ${customerType === "new" ? "bg-card text-foreground shadow-sm" : "text-muted-foreground hover:bg-muted/50"}`}>
-                    Create New
-                  </button>
-                </div>
-              )}
+            <form onSubmit={handleSubmit} className="flex flex-col flex-1 overflow-hidden">
+              <div className="p-6 sm:p-8 space-y-6 overflow-y-auto flex-1">
+                
+                {/* Mode Selector for New vs Existing Customer */}
+                {!editingId && (
+                  <div className="bg-muted/40 p-1.5 rounded-2xl flex gap-2 border border-border/60">
+                    <button
+                      type="button"
+                      onClick={() => setCustomerType("old")}
+                      className={`flex-1 py-3 px-4 rounded-xl text-xs sm:text-sm font-bold flex items-center justify-center gap-2 transition-all ${
+                        customerType === "old"
+                          ? "bg-card text-foreground shadow-sm border border-border/80"
+                          : "text-muted-foreground hover:text-foreground hover:bg-muted/50"
+                      }`}
+                    >
+                      <Users className="w-4 h-4 text-primary" />
+                      <span>Search Existing Customer</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setCustomerType("new")}
+                      className={`flex-1 py-3 px-4 rounded-xl text-xs sm:text-sm font-bold flex items-center justify-center gap-2 transition-all ${
+                        customerType === "new"
+                          ? "bg-card text-foreground shadow-sm border border-border/80"
+                          : "text-muted-foreground hover:text-foreground hover:bg-muted/50"
+                      }`}
+                    >
+                      <UserPlus className="w-4 h-4 text-emerald-600" />
+                      <span>Register New Customer</span>
+                    </button>
+                  </div>
+                )}
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-6">
-                {/* Left Side: Customer Info */}
-                <div className="space-y-6">
+                {/* Section 1: Customer Information Card */}
+                <div className="p-5 rounded-2xl bg-muted/20 border border-border/70 space-y-4">
+                  <div className="flex items-center gap-2 text-xs font-bold text-primary uppercase tracking-wider">
+                    <User className="w-4 h-4" />
+                    <span>Customer Information</span>
+                  </div>
+
                   {(customerType === "old" || editingId) ? (
                     <div className="space-y-4">
-                      <h4 className="text-xs font-bold text-primary uppercase tracking-widest flex items-center gap-2">
-                        <Search className="w-3 h-3" /> Customer Selection
-                      </h4>
                       <div>
-                        <label className={labelClass}>Search Client</label>
+                        <label className={labelClass}>Search Client Profile</label>
                         <div className="relative mb-3">
-                          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-                          <input value={customerSearch} onChange={(e) => setCustomerSearch(e.target.value)}
-                            placeholder="Search by ID, Name or Phone..." className={inputClass + " pl-10"} />
+                          <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                          <input
+                            value={customerSearch}
+                            onChange={(e) => setCustomerSearch(e.target.value)}
+                            placeholder="Search by customer ID, name, phone, or email..."
+                            className={inputClass + " pl-10 h-11"}
+                          />
                         </div>
-                        <div className="space-y-2 max-h-[200px] overflow-y-auto border border-border rounded-lg p-1 bg-muted/20">
+                        <div className="space-y-1.5 max-h-[180px] overflow-y-auto border border-border rounded-xl p-1.5 bg-background">
                           {filteredCustomers.length === 0 ? (
-                            <div className="p-3 text-center text-xs text-muted-foreground italic">No results found</div>
+                            <div className="p-4 text-center text-xs text-muted-foreground italic">
+                              No matching clients found in directory
+                            </div>
                           ) : (
                             filteredCustomers.slice(0, 10).map((c) => (
-                              <button key={c.id} type="button" onClick={() => setForm({ ...form, customer_id: c.id, branch_id: c.branch_id || form.branch_id })}
-                                className={`w-full text-left p-2.5 rounded-md text-xs transition-all flex items-center justify-between border ${form.customer_id === c.id ? "bg-primary/10 border-primary/30 font-bold" : "bg-card border-transparent hover:border-primary/20 hover:bg-muted/50"}`}>
-                                <span>{c.name} <span className="text-muted-foreground opacity-70 ml-1 font-mono">{c.customer_id || '—'}</span></span>
-                                <span className="opacity-70">{c.phone}</span>
+                              <button
+                                key={c.id}
+                                type="button"
+                                onClick={() => setForm({ ...form, customer_id: c.id, branch_id: c.branch_id || form.branch_id })}
+                                className={`w-full text-left p-3 rounded-xl text-xs transition-all flex items-center justify-between border ${
+                                  form.customer_id === c.id
+                                    ? "bg-primary/10 border-primary/40 font-bold text-foreground"
+                                    : "bg-card border-transparent hover:border-primary/20 hover:bg-muted/50 text-foreground"
+                                }`}
+                              >
+                                <div className="flex items-center gap-2.5">
+                                  <div className="w-7 h-7 rounded-lg bg-primary/15 text-primary flex items-center justify-center font-bold text-[11px]">
+                                    {(c.name || 'C').charAt(0).toUpperCase()}
+                                  </div>
+                                  <div>
+                                    <span className="font-semibold">{c.name}</span>
+                                    <span className="text-muted-foreground ml-2 font-mono text-[10px] bg-muted px-1.5 py-0.5 rounded">
+                                      {c.customer_id || '—'}
+                                    </span>
+                                  </div>
+                                </div>
+                                <span className="text-muted-foreground font-mono">{c.phone}</span>
                               </button>
                             ))
                           )}
                         </div>
+
                         {form.customer_id && (
-                          <div className="mt-3 p-3 rounded-xl bg-primary/5 border border-primary/10 animate-in fade-in slide-in-from-top-2 duration-300">
+                          <div className="mt-4 p-4 rounded-2xl bg-primary/5 border border-primary/20 animate-in fade-in slide-in-from-top-2 duration-300">
                             <div className="flex justify-between items-start">
-                              <div>
-                                <h5 className="text-[10px] font-bold text-primary uppercase tracking-widest">Active Selection</h5>
-                                <p className="text-sm font-bold mt-1 text-foreground">{customers.find(c => c.id === form.customer_id)?.name}</p>
-                                <p className="text-xs text-muted-foreground font-mono">{customers.find(c => c.id === form.customer_id)?.customer_id} | {customers.find(c => c.id === form.customer_id)?.phone}</p>
-                                {customers.find(c => c.id === form.customer_id)?.email && (
-                                  <p className="text-xs text-muted-foreground font-mono mt-0.5">{customers.find(c => c.id === form.customer_id)?.email}</p>
-                                )}
+                              <div className="flex items-center gap-3">
+                                <div className="w-10 h-10 rounded-xl bg-primary text-primary-foreground flex items-center justify-center font-bold text-sm shadow-sm">
+                                  {(customers.find(c => c.id === form.customer_id)?.name || 'C').charAt(0).toUpperCase()}
+                                </div>
+                                <div>
+                                  <div className="text-[10px] font-bold text-primary uppercase tracking-wider">Selected Client</div>
+                                  <p className="text-sm font-bold text-foreground mt-0.5">
+                                    {customers.find(c => c.id === form.customer_id)?.name}
+                                  </p>
+                                  <p className="text-xs text-muted-foreground font-mono mt-0.5">
+                                    ID: {customers.find(c => c.id === form.customer_id)?.customer_id || 'N/A'} | 📞 {customers.find(c => c.id === form.customer_id)?.phone}
+                                  </p>
+                                  {customers.find(c => c.id === form.customer_id)?.email && (
+                                    <p className="text-xs text-primary font-mono mt-0.5 flex items-center gap-1">
+                                      <Mail className="w-3 h-3" /> {customers.find(c => c.id === form.customer_id)?.email}
+                                    </p>
+                                  )}
+                                </div>
                               </div>
-                              <button type="button" onClick={() => setForm({ ...form, customer_id: "" })} className="text-[10px] font-bold text-destructive uppercase hover:underline">Clear</button>
+                              <button
+                                type="button"
+                                onClick={() => setForm({ ...form, customer_id: "" })}
+                                className="text-xs font-bold text-destructive hover:underline px-2 py-1 rounded-lg hover:bg-destructive/10 transition-colors"
+                              >
+                                Change
+                              </button>
                             </div>
+
                             {!customers.find(c => c.id === form.customer_id)?.email && (
-                              <div className="mt-3 pt-2.5 border-t border-primary/10">
-                                <label className={labelClass}>Customer Email * (Mandatory)</label>
-                                <input
-                                  type="email"
-                                  required
-                                  value={existingCustomerEmail}
-                                  onChange={(e) => setExistingCustomerEmail(e.target.value)}
-                                  className={inputClass}
-                                  placeholder="Enter customer email (required to register)..."
-                                />
+                              <div className="mt-3 pt-3 border-t border-primary/15">
+                                <label className={labelClass}>Customer Email * (Mandatory for Outbound Alerts)</label>
+                                <div className="relative">
+                                  <Mail className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                                  <input
+                                    type="email"
+                                    required
+                                    value={existingCustomerEmail}
+                                    onChange={(e) => setExistingCustomerEmail(e.target.value)}
+                                    className={inputClass + " pl-10"}
+                                    placeholder="Enter customer email (required to send receipts & status)..."
+                                  />
+                                </div>
                               </div>
                             )}
                           </div>
@@ -874,173 +958,289 @@ const Complaints = () => {
                     </div>
                   ) : (
                     <div className="space-y-4">
-                      <h4 className="text-xs font-bold text-primary uppercase tracking-widest flex items-center gap-2">
-                        <Plus className="w-3 h-3" /> New Customer
-                      </h4>
-                      <div className="grid grid-cols-2 gap-4">
-                        <div><label className={labelClass}>Name *</label><input required value={newCustomer.name} onChange={(e) => setNewCustomer({ ...newCustomer, name: e.target.value })} className={inputClass} placeholder="Full Name" /></div>
-                        <div><label className={labelClass}>Phone *</label><input required value={newCustomer.phone} onChange={(e) => setNewCustomer({ ...newCustomer, phone: e.target.value })} className={inputClass} placeholder="Phone Number" /></div>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <div>
+                          <label className={labelClass}>Full Name *</label>
+                          <div className="relative">
+                            <User className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                            <input
+                              required
+                              value={newCustomer.name}
+                              onChange={(e) => setNewCustomer({ ...newCustomer, name: e.target.value })}
+                              className={inputClass + " pl-10"}
+                              placeholder="e.g. Muhammad Ali"
+                            />
+                          </div>
+                        </div>
+                        <div>
+                          <label className={labelClass}>Phone Number *</label>
+                          <div className="relative">
+                            <Phone className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                            <input
+                              required
+                              value={newCustomer.phone}
+                              onChange={(e) => setNewCustomer({ ...newCustomer, phone: e.target.value })}
+                              className={inputClass + " pl-10"}
+                              placeholder="e.g. 0300 1234567"
+                            />
+                          </div>
+                        </div>
                       </div>
-                      <div><label className={labelClass}>Email * (Mandatory)</label><input type="email" required value={newCustomer.email} onChange={(e) => setNewCustomer({ ...newCustomer, email: e.target.value })} className={inputClass} placeholder="customer@example.com" /></div>
-                      <div><label className={labelClass}>Address</label><input value={newCustomer.address} onChange={(e) => setNewCustomer({ ...newCustomer, address: e.target.value })} className={inputClass} placeholder="Street Address" /></div>
+
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <div>
+                          <label className={labelClass}>Email Address * (Mandatory)</label>
+                          <div className="relative">
+                            <Mail className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                            <input
+                              type="email"
+                              required
+                              value={newCustomer.email}
+                              onChange={(e) => setNewCustomer({ ...newCustomer, email: e.target.value })}
+                              className={inputClass + " pl-10"}
+                              placeholder="customer@example.com"
+                            />
+                          </div>
+                        </div>
+                        <div>
+                          <label className={labelClass}>Street / Site Address</label>
+                          <div className="relative">
+                            <MapPin className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                            <input
+                              value={newCustomer.address}
+                              onChange={(e) => setNewCustomer({ ...newCustomer, address: e.target.value })}
+                              className={inputClass + " pl-10"}
+                              placeholder="House/Plot #, Sector, City"
+                            />
+                          </div>
+                        </div>
+                      </div>
                     </div>
                   )}
+                </div>
 
-                  <div className="space-y-4">
-                    <h4 className="text-xs font-bold text-primary uppercase tracking-widest flex items-center gap-2">
-                      <Filter className="w-3 h-3" /> Service Metrics
-                    </h4>
-                    <div className="grid grid-cols-3 gap-3">
-                      <div><label className={labelClass}>Priority</label>
-                        <select value={form.priority} onChange={(e) => setForm({ ...form, priority: e.target.value as any })} className={inputClass}>
-                          <option value="low">Low</option>
-                          <option value="medium">Medium</option>
-                          <option value="high">High</option>
-                          <option value="emergency">Emergency</option>
-                        </select>
-                      </div>
-                      <div><label className={labelClass}>Warranty Status</label>
-                        <select value={form.warranty_type} onChange={(e) => setForm({ ...form, warranty_type: e.target.value })} className={inputClass}>
-                          <option value="warranty">Warranty</option>
-                          <option value="non_warranty">Non-Warranty</option>
-                        </select>
-                      </div>
-                      <div><label className={labelClass}>Serial Number</label>
+                {/* Section 2: Equipment & Service Specifications */}
+                <div className="p-5 rounded-2xl bg-muted/20 border border-border/70 space-y-4">
+                  <div className="flex items-center gap-2 text-xs font-bold text-primary uppercase tracking-wider">
+                    <Wrench className="w-4 h-4" />
+                    <span>Equipment & Service Details</span>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                    <div>
+                      <label className={labelClass}>Service Type</label>
+                      <select
+                        value={form.complaint_type}
+                        onChange={(e) => setForm({ ...form, complaint_type: e.target.value as any })}
+                        className={inputClass}
+                      >
+                        <option value="repair">Repair</option>
+                        <option value="installation">Installation</option>
+                        <option value="maintenance">Maintenance</option>
+                      </select>
+                    </div>
+
+                    <div>
+                      <label className={labelClass}>Priority Level</label>
+                      <select
+                        value={form.priority}
+                        onChange={(e) => setForm({ ...form, priority: e.target.value as any })}
+                        className={inputClass}
+                      >
+                        <option value="low">🟢 Low</option>
+                        <option value="medium">🟡 Medium</option>
+                        <option value="high">🟠 High</option>
+                        <option value="emergency">🔴 Emergency</option>
+                      </select>
+                    </div>
+
+                    <div>
+                      <label className={labelClass}>Warranty Coverage</label>
+                      <select
+                        value={form.warranty_type}
+                        onChange={(e) => setForm({ ...form, warranty_type: e.target.value })}
+                        className={inputClass}
+                      >
+                        <option value="warranty">🛡️ In Warranty</option>
+                        <option value="non_warranty">❌ Non-Warranty</option>
+                      </select>
+                    </div>
+
+                    <div>
+                      <label className={labelClass}>Serial Number</label>
+                      <div className="relative">
+                        <Hash className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
                         <input
                           type="text"
                           value={form.serial_number}
                           onChange={(e) => setForm({ ...form, serial_number: e.target.value })}
-                          placeholder="e.g. SN-098234"
-                          className={inputClass}
+                          placeholder="e.g. SN-892314"
+                          className={inputClass + " pl-10 font-mono"}
                         />
                       </div>
                     </div>
                   </div>
                 </div>
 
-                {/* Right Side: Assignment & Details */}
-                <div className="space-y-6">
-                  <div className="space-y-4">
-                    <h4 className="text-xs font-bold text-primary uppercase tracking-widest flex items-center gap-2">
-                      <Clock className="w-3 h-3" /> Assignment & Schedule
-                    </h4>
-                    <div className="grid grid-cols-2 gap-4">
-                      <div><label className={labelClass}>Branch *</label>
-                        <select
-                          value={form.branch_id}
-                          onChange={(e) => setForm({ ...form, branch_id: e.target.value })}
-                          className={inputClass}
-                          disabled={hasRole("branch_admin") && !hasRole("super_admin")}
-                        >
-                          <option value="">Select</option>
-                          {branches
-                            .filter(b => !hasRole("branch_admin") || hasRole("super_admin") || b.id === profile?.branch_id)
-                            .map((b) => <option key={b.id} value={b.id}>{b.name}</option>)
-                          }
-                        </select>
-                      </div>
-                      <div><label className={labelClass}>Service Type</label>
-                        <select value={form.complaint_type} onChange={(e) => setForm({ ...form, complaint_type: e.target.value as any })} className={inputClass}>
-                          <option value="repair">Repair</option>
-                          <option value="installation">Installation</option>
-                          <option value="maintenance">Maintenance</option>
-                        </select>
-                      </div>
-                    </div>
-                    <div className="grid grid-cols-2 gap-4">
-                      <div><label className={labelClass}>Technician</label>
-                        <select value={form.assigned_to} onChange={(e) => setForm({ ...form, assigned_to: e.target.value })} className={inputClass}>
-                          <option value="">None Assigned</option>
-                          {technicians.filter(t => !form.branch_id || t.branch_id === form.branch_id).map((t) => (
-                            <option key={t.id} value={t.id}>{t.full_name}</option>
-                          ))}
-                        </select>
-                      </div>
-                      <div><label className={labelClass}>Helper (Optional)</label>
-                        <select value={form.assigned_helper} onChange={(e) => setForm({ ...form, assigned_helper: e.target.value })} className={inputClass}>
-                          <option value="">None Assigned</option>
-                          {technicians.filter(t => !form.branch_id || t.branch_id === form.branch_id).map((t) => (
-                            <option key={t.id} value={t.id}>{t.full_name}</option>
-                          ))}
-                        </select>
-                      </div>
-                    </div>
+                {/* Section 3: Branch & Technician Allocation */}
+                <div className="p-5 rounded-2xl bg-muted/20 border border-border/70 space-y-4">
+                  <div className="flex items-center gap-2 text-xs font-bold text-primary uppercase tracking-wider">
+                    <Building2 className="w-4 h-4" />
+                    <span>Branch & Staff Allocation</span>
                   </div>
 
-                  <div className="space-y-4">
-                    <h4 className="text-xs font-bold text-primary uppercase tracking-widest flex items-center gap-2">
-                      <FileText className="w-3 h-3" /> Additional Info
-                    </h4>
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                     <div>
-                      <label className={labelClass}>Complaint Description *</label>
-                      <textarea
-                        value={form.description}
-                        onChange={(e) => setForm({ ...form, description: e.target.value })}
-                        rows={5}
-                        className={inputClass + " resize-none"}
-                        placeholder="Detailed issue description..."
-                      />
+                      <label className={labelClass}>Target Branch *</label>
+                      <select
+                        value={form.branch_id}
+                        onChange={(e) => setForm({ ...form, branch_id: e.target.value })}
+                        className={inputClass}
+                        disabled={hasRole("branch_admin") && !hasRole("super_admin")}
+                      >
+                        <option value="">Select Branch</option>
+                        {branches
+                          .filter(b => !hasRole("branch_admin") || hasRole("super_admin") || b.id === profile?.branch_id)
+                          .map((b) => <option key={b.id} value={b.id}>{b.name}</option>)
+                        }
+                      </select>
                     </div>
-                    {/* Attachments section removed per user request */}
+
+                    <div>
+                      <label className={labelClass}>Lead Technician</label>
+                      <select
+                        value={form.assigned_to}
+                        onChange={(e) => setForm({ ...form, assigned_to: e.target.value })}
+                        className={inputClass}
+                      >
+                        <option value="">None Assigned (Pending)</option>
+                        {technicians.filter(t => !form.branch_id || t.branch_id === form.branch_id).map((t) => (
+                          <option key={t.id} value={t.id}>{t.full_name}</option>
+                        ))}
+                      </select>
+                    </div>
+
+                    <div>
+                      <label className={labelClass}>Assistant / Helper (Optional)</label>
+                      <select
+                        value={form.assigned_helper}
+                        onChange={(e) => setForm({ ...form, assigned_helper: e.target.value })}
+                        className={inputClass}
+                      >
+                        <option value="">None Assigned</option>
+                        {technicians.filter(t => !form.branch_id || t.branch_id === form.branch_id).map((t) => (
+                          <option key={t.id} value={t.id}>{t.full_name}</option>
+                        ))}
+                      </select>
+                    </div>
                   </div>
+                </div>
+
+                {/* Section 4: Problem Statement */}
+                <div className="p-5 rounded-2xl bg-muted/20 border border-border/70 space-y-3">
+                  <div className="flex items-center gap-2 text-xs font-bold text-primary uppercase tracking-wider">
+                    <FileText className="w-4 h-4" />
+                    <span>Problem Description *</span>
+                  </div>
+                  <textarea
+                    value={form.description}
+                    onChange={(e) => setForm({ ...form, description: e.target.value })}
+                    rows={4}
+                    className={inputClass + " resize-none"}
+                    placeholder="Enter thorough problem symptoms, customer requests, or special handling notes..."
+                    required
+                  />
                 </div>
               </div>
 
-              <div className="flex gap-4 pt-4 border-t border-border">
-                <button type="submit" className="flex-1 rounded-2xl bg-foreground text-background py-4 text-sm font-bold shadow-xl shadow-black/10 hover:opacity-90 transition-all active:scale-[0.98]">
-                  {editingId ? "Update Record" : "Confirm"}
+              {/* Modal Footer */}
+              <div className="px-6 sm:px-8 py-4 bg-muted/30 border-t border-border flex items-center justify-end gap-3 shrink-0">
+                <button
+                  type="button"
+                  onClick={resetForm}
+                  className="px-5 py-2.5 rounded-xl border border-border text-xs sm:text-sm font-semibold text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+                >
+                  Cancel
                 </button>
-                <button type="button" onClick={resetForm} className="flex-1 rounded-2xl border border-input py-4 text-sm font-bold text-foreground hover:bg-muted transition-colors">Cancel</button>
+                <button
+                  type="submit"
+                  className="px-8 py-2.5 rounded-xl bg-primary text-primary-foreground text-xs sm:text-sm font-bold shadow-lg shadow-primary/25 hover:bg-primary/90 transition-all active:scale-[0.98] flex items-center gap-2"
+                >
+                  <Check className="w-4 h-4" />
+                  <span>{editingId ? "Save Changes" : "Register Complaint"}</span>
+                </button>
               </div>
             </form>
           </div>
         </div>
       )}
 
-      {/* Solve Complaint Modal */}
+      {/* Modern Solve Complaint Modal */}
       {solvingComplaint && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-foreground/30 backdrop-blur-sm p-4 animate-in fade-in duration-200">
-          <div className="w-full max-w-md rounded-3xl bg-card border border-border p-8 shadow-elevated">
-            <div className="flex items-center justify-between mb-6">
-              <div>
-                <h3 className="text-xl font-bold font-display text-card-foreground">Mark as Solved</h3>
-                <p className="text-sm text-muted-foreground">Add final resolution notes.</p>
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-foreground/40 backdrop-blur-md p-4 animate-in fade-in duration-200">
+          <div className="w-full max-w-lg rounded-3xl bg-card border border-border p-6 sm:p-8 shadow-2xl space-y-6">
+            
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3.5">
+                <div className="w-12 h-12 rounded-2xl bg-emerald-500/10 text-emerald-600 border border-emerald-500/20 flex items-center justify-center shadow-sm">
+                  <CheckCircle2 className="w-6 h-6" />
+                </div>
+                <div>
+                  <h3 className="text-xl font-black font-display text-foreground tracking-tight">Mark as Solved</h3>
+                  <p className="text-xs text-muted-foreground mt-0.5">
+                    Resolve Complaint #{solvingComplaint.complaint_number}
+                  </p>
+                </div>
               </div>
-              <button onClick={() => setSolvingComplaint(null)} className="p-2 rounded-xl hover:bg-muted text-muted-foreground transition-colors">
+              <button
+                onClick={() => setSolvingComplaint(null)}
+                className="p-2 rounded-xl hover:bg-muted text-muted-foreground transition-colors"
+              >
                 <XCircle className="w-6 h-6" />
               </button>
             </div>
 
-            <div className="space-y-6">
+            {/* Quick summary banner */}
+            <div className="p-3.5 rounded-xl bg-muted/40 border border-border/80 flex items-center justify-between text-xs">
               <div>
-                <label className={labelClass}>Resolution Note *</label>
-                <textarea
-                  value={solveForm.notes}
-                  onChange={(e) => setSolveForm({ ...solveForm, notes: e.target.value })}
-                  rows={4}
-                  className={inputClass + " resize-none"}
-                  placeholder="Describe how the issue was resolved..."
-                  required
-                />
+                <span className="text-muted-foreground">Customer: </span>
+                <span className="font-bold text-foreground">{solvingComplaint.customer?.name || "Client"}</span>
               </div>
-
-              {/* Attachments section removed per user request */}
-
-              <div className="flex gap-3 pt-2">
-                <button
-                  onClick={handleSolve}
-                  disabled={!solveForm.notes}
-                  className="flex-1 rounded-2xl bg-emerald-600 text-white py-4 text-sm font-bold shadow-lg shadow-emerald-600/20 hover:bg-emerald-700 transition-all active:scale-[0.98] disabled:opacity-50 disabled:pointer-events-none"
-                >
-                  Confirm Solved
-                </button>
-                <button
-                  onClick={() => setSolvingComplaint(null)}
-                  className="flex-1 rounded-2xl border border-input py-4 text-sm font-bold text-foreground hover:bg-muted transition-colors"
-                >
-                  Cancel
-                </button>
+              <div>
+                <span className="text-muted-foreground font-mono">SN: </span>
+                <span className="font-mono font-bold text-primary">{solvingComplaint.serial_number || "—"}</span>
               </div>
+            </div>
+
+            <div className="space-y-3">
+              <label className={labelClass}>Resolution Notes *</label>
+              <textarea
+                value={solveForm.notes}
+                onChange={(e) => setSolveForm({ ...solveForm, notes: e.target.value })}
+                rows={5}
+                className={inputClass + " resize-none focus:ring-emerald-500"}
+                placeholder="Detail the work carried out, repairs completed, or parts swapped..."
+                required
+              />
+            </div>
+
+            <div className="flex gap-3 pt-2">
+              <button
+                type="button"
+                onClick={() => setSolvingComplaint(null)}
+                className="flex-1 rounded-xl border border-input py-3 text-xs sm:text-sm font-bold text-foreground hover:bg-muted transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleSolve}
+                disabled={!solveForm.notes}
+                className="flex-1 rounded-xl bg-emerald-600 text-white py-3 text-xs sm:text-sm font-bold shadow-lg shadow-emerald-600/25 hover:bg-emerald-700 transition-all active:scale-[0.98] disabled:opacity-50 disabled:pointer-events-none flex items-center justify-center gap-2"
+              >
+                <Check className="w-4 h-4" />
+                <span>Confirm & Mark Solved</span>
+              </button>
             </div>
           </div>
         </div>

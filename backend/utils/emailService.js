@@ -1,3 +1,4 @@
+const crypto = require('crypto');
 const nodemailer = require('nodemailer');
 const pool = require('../config/db');
 const bankService = require('./bankService');
@@ -7,15 +8,14 @@ const ensureSettingsTable = async () => {
     try {
         await pool.query(`
             CREATE TABLE IF NOT EXISTS settings (
-                id VARCHAR(36) PRIMARY KEY,
-                \`key\` VARCHAR(100) UNIQUE NOT NULL,
-                value JSON NOT NULL,
+                \`key\` VARCHAR(100) PRIMARY KEY,
+                \`value\` LONGTEXT NOT NULL,
                 updated_by VARCHAR(36),
                 updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
             ) ENGINE=InnoDB;
         `);
     } catch (e) {
-        console.error('[EmailService] Error checking settings table:', e.message);
+        // Table may already exist with alternative schema
     }
 };
 
@@ -229,6 +229,9 @@ const sendMail = async ({ to, subject, html, attachments = [] }) => {
         const replyTo = company.email || senderEmail;
         const plainText = htmlToPlainText(html);
 
+        const senderDomain = (senderEmail.includes('@') ? senderEmail.split('@')[1] : 'ecs.it.com').trim();
+        const msgId = `<${Date.now()}.${crypto.randomUUID()}@${senderDomain}>`;
+
         const info = await transporter.sendMail({
             from,
             to,
@@ -237,11 +240,13 @@ const sendMail = async ({ to, subject, html, attachments = [] }) => {
             text: plainText,
             html,
             attachments,
+            messageId: msgId,
             headers: {
                 'X-Mailer': 'ECS-Portal/2.0',
                 'X-Priority': '3',
                 'Auto-Submitted': 'auto-generated',
-                'X-Auto-Response-Suppress': 'OOF, AutoReply'
+                'X-Auto-Response-Suppress': 'OOF, AutoReply',
+                'List-Unsubscribe': `<mailto:${company.email || senderEmail}?subject=Unsubscribe>`
             }
         });
 

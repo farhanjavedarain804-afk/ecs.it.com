@@ -54,7 +54,7 @@ router.patch('/:key', auth(), async (req, res) => {
         
         console.log(`[Settings] Update request for ${key}:`, value);
 
-        await upsertSetting(pool, key, value);
+        await upsertSetting(pool, key, value, req.user?.id);
         
         res.json({ success: true, message: `Setting ${key} updated` });
     } catch (err) {
