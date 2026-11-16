@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useToast } from "@/hooks/use-toast";
 import { useRef } from "react";
-import { Plus, Search, Edit2, Clock, CheckCircle2, AlertTriangle, XCircle, FileDown, Paperclip, ImageIcon, Filter, FileText, Upload, Trash2, Lock } from "lucide-react";
+import { Plus, Search, Edit2, Clock, CheckCircle2, AlertTriangle, XCircle, FileDown, Paperclip, ImageIcon, Filter, FileText, Upload, Trash2, Lock, Phone, Mail, MapPin, ExternalLink, Printer, History, Calendar, User, Wrench, Shield, Copy, Check, Hash, ArrowUpRight } from "lucide-react";
 import { generatePDF, exportTableToPDF } from "@/utils/pdfGenerator";
 import { logActivity } from "@/utils/logger";
 
@@ -63,6 +63,38 @@ const Complaints = () => {
   const [solvingComplaint, setSolvingComplaint] = useState<any>(null);
   const [solveForm, setSolveForm] = useState({ notes: "", attachments: [] as string[] });
   const [viewComplaint, setViewComplaint] = useState<any>(null);
+  const [customerHistory, setCustomerHistory] = useState<{ complaints: any[], invoices: any[] }>({ complaints: [], invoices: [] });
+  const [loadingHistory, setLoadingHistory] = useState(false);
+  const [activeHistoryTab, setActiveHistoryTab] = useState<'complaints' | 'invoices'>('complaints');
+  const [copiedSerial, setCopiedSerial] = useState(false);
+
+  const openViewComplaint = async (complaint: any) => {
+    setViewComplaint(complaint);
+    setCustomerHistory({ complaints: [], invoices: [] });
+    setActiveHistoryTab('complaints');
+
+    const customerId = complaint.customer_id || complaint.customers?.id;
+    if (customerId) {
+      setLoadingHistory(true);
+      try {
+        const headers = { Authorization: `Bearer ${localStorage.getItem("ecs_token")}` };
+        const [compRes, invRes] = await Promise.all([
+          fetch(`${API_URL}/api/complaints?customer_id=${customerId}&all_records=true`, { headers }),
+          fetch(`${API_URL}/api/invoices?customer_id=${customerId}`, { headers })
+        ]);
+        const compData = compRes.ok ? await compRes.json() : [];
+        const invData = invRes.ok ? await invRes.json() : [];
+        setCustomerHistory({
+          complaints: Array.isArray(compData) ? compData.filter((c: any) => c.id !== complaint.id) : [],
+          invoices: Array.isArray(invData) ? invData : []
+        });
+      } catch (err) {
+        console.error("Error loading customer history:", err);
+      } finally {
+        setLoadingHistory(false);
+      }
+    }
+  };
   const imageInputRef = useRef<HTMLInputElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [uploading, setUploading] = useState(false);
@@ -693,7 +725,7 @@ const Complaints = () => {
                       </td>
                       <td className="px-4 py-3 text-muted-foreground tabular-nums">{new Date(c.created_at).toLocaleDateString()}</td>
                       <td className="px-4 py-3 text-right flex justify-end gap-2">
-                        <button onClick={() => setViewComplaint(c)} className="p-2 rounded-lg hover:bg-info/10 text-info transition-colors" title="View Details">
+                        <button onClick={() => openViewComplaint(c)} className="p-2 rounded-lg hover:bg-info/10 text-info transition-colors" title="View Details">
                           <Search className="w-4 h-4" />
                         </button>
                         {isEditable(c) ? (
@@ -1014,88 +1046,358 @@ const Complaints = () => {
         </div>
       )}
 
-      {/* Detail View Modal */}
+      {/* Professional Detail View Modal */}
       {viewComplaint && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-foreground/30 backdrop-blur-sm p-4 animate-in fade-in duration-200">
-          <div className="w-full max-w-2xl rounded-3xl bg-card border border-border p-8 shadow-elevated overflow-y-auto max-h-[90vh]">
-            <div className="flex items-center justify-between mb-8">
-              <div className="flex items-center gap-4">
-                <div className="w-12 h-12 rounded-2xl bg-primary/10 flex items-center justify-center text-primary font-bold">#</div>
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-foreground/40 backdrop-blur-md p-3 sm:p-6 animate-in fade-in duration-200">
+          <div className="w-full max-w-4xl rounded-3xl bg-card border border-border shadow-2xl overflow-hidden flex flex-col max-h-[92vh]">
+            
+            {/* Modal Header */}
+            <div className="px-6 sm:px-8 py-5 border-b border-border bg-gradient-to-r from-muted/60 via-card to-muted/40 flex flex-wrap items-center justify-between gap-4 shrink-0">
+              <div className="flex items-center gap-3.5">
+                <div className="w-12 h-12 rounded-2xl bg-primary/10 border border-primary/20 flex items-center justify-center text-primary shadow-sm">
+                  <FileText className="w-6 h-6" />
+                </div>
                 <div>
-                  <h3 className="text-xl font-bold font-display text-card-foreground">Complaint Details</h3>
-                  <p className="text-sm text-muted-foreground">{viewComplaint.complaint_number}</p>
-                </div>
-              </div>
-              <button onClick={() => setViewComplaint(null)} className="p-2 rounded-xl hover:bg-muted text-muted-foreground"><XCircle className="w-6 h-6" /></button>
-            </div>
-
-            <div className="grid grid-cols-2 gap-8">
-              <div className="space-y-6">
-                <div><label className={labelClass}>Customer Details</label><p className="text-sm font-semibold">{viewComplaint.customers?.name}</p><p className="text-xs text-muted-foreground">{viewComplaint.customers?.phone}</p><p className="text-xs text-muted-foreground mt-1">{viewComplaint.customers?.address || "No address provided"}</p></div>
-                <div><label className={labelClass}>Branch</label><p className="text-sm font-semibold">{viewComplaint.branches?.name}</p></div>
-                <div><label className={labelClass}>Assignment</label>
-                  <div className="space-y-2">
-                    <p className="text-xs text-muted-foreground">Technician: <span className="text-foreground font-semibold">{viewComplaint.staff?.full_name || "Unassigned"}</span></p>
-                    <p className="text-xs text-muted-foreground">Helper: <span className="text-foreground font-semibold">{viewComplaint.helper?.full_name || "None"}</span></p>
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <h3 className="text-xl font-black font-display text-foreground tracking-tight">
+                      Complaint #{viewComplaint.complaint_number}
+                    </h3>
+                    <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider ${statusColors[viewComplaint.status] || "bg-muted text-muted-foreground"}`}>
+                      {viewComplaint.status?.replace(/_/g, ' ')}
+                    </span>
+                    <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider ${priorityColors[viewComplaint.priority] || "bg-muted text-muted-foreground"}`}>
+                      {viewComplaint.priority} Priority
+                    </span>
                   </div>
+                  <p className="text-xs text-muted-foreground mt-0.5 flex items-center gap-2">
+                    <span>Registered: {viewComplaint.created_at ? new Date(viewComplaint.created_at).toLocaleString() : 'N/A'}</span>
+                    <span>•</span>
+                    <span className="font-mono text-emerald-600 font-bold">VID: {viewComplaint.verification_id || 'N/A'}</span>
+                  </p>
                 </div>
               </div>
-              <div className="space-y-6">
-                <div><label className={labelClass}>Status & Priority</label>
-                  <div className="flex gap-2">
-                    <span className={`px-2 py-1 rounded-lg text-[10px] font-bold uppercase ${statusColors[viewComplaint.status] || ""}`}>{viewComplaint.status.replace('_', ' ')}</span>
-                    <span className={`px-2 py-1 rounded-lg text-[10px] font-bold uppercase ${priorityColors[viewComplaint.priority] || ""}`}>{viewComplaint.priority}</span>
+
+              {/* Header Action Buttons */}
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => generatePDF('complaint_receipt', viewComplaint)}
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-muted hover:bg-muted/80 text-foreground text-xs font-bold transition-all shadow-sm active:scale-95 border border-border"
+                  title="Download / Print Complaint Slip"
+                >
+                  <Printer className="w-3.5 h-3.5 text-primary" />
+                  <span className="hidden sm:inline">Print Slip</span>
+                </button>
+                <a
+                  href={`/verify?id=${viewComplaint.verification_id || viewComplaint.complaint_number}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-primary/10 hover:bg-primary/20 text-primary text-xs font-bold transition-all border border-primary/20 active:scale-95"
+                  title="Open Public Tracking Page"
+                >
+                  <ExternalLink className="w-3.5 h-3.5" />
+                  <span className="hidden sm:inline">Track</span>
+                </a>
+                <button 
+                  onClick={() => setViewComplaint(null)} 
+                  className="w-8 h-8 rounded-full hover:bg-muted text-muted-foreground hover:text-foreground flex items-center justify-center transition-colors"
+                >
+                  <XCircle className="w-5 h-5" />
+                </button>
+              </div>
+            </div>
+
+            {/* Scrollable Content */}
+            <div className="flex-1 overflow-y-auto p-6 sm:p-8 space-y-6">
+              
+              {/* Row 1: Customer Profile & Service Specifications */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                
+                {/* Customer Information Card */}
+                <div className="p-5 rounded-2xl bg-muted/20 border border-border space-y-4">
+                  <div className="flex items-center justify-between pb-2 border-b border-border/60">
+                    <h4 className="text-xs font-black uppercase tracking-widest text-primary flex items-center gap-2">
+                      <User className="w-4 h-4" /> Customer Profile
+                    </h4>
+                    <span className="text-[10px] font-mono font-bold text-muted-foreground uppercase">
+                      ID: {viewComplaint.customers?.customer_id || viewComplaint.customer_id?.slice(0, 8) || 'N/A'}
+                    </span>
                   </div>
-                </div>
-                <div><label className={labelClass}>Resolution Expected</label><p className="text-sm font-semibold text-primary">{viewComplaint.resolution_time || "48 Hours"}</p></div>
-                <div><label className={labelClass}>Verification ID</label><p className="text-sm font-mono font-bold text-emerald-600">{viewComplaint.verification_id || "—"}</p></div>
-                <div><label className={labelClass}>Serial Number</label><p className="text-sm font-semibold font-mono">{viewComplaint.serial_number || "—"}</p></div>
-                <div><label className={labelClass}>Warranty</label><p className="text-xs font-bold uppercase text-muted-foreground">{viewComplaint.warranty_type.replace('_', ' ')}</p></div>
-              </div>
-            </div>
 
-            <div className="mt-8 pt-8 border-t border-border">
-              <label className={labelClass}>Description</label>
-              <div className="p-4 rounded-xl bg-muted/30 text-sm text-foreground italic border border-border leading-relaxed">"{viewComplaint.description}"</div>
-            </div>
+                  <div className="space-y-2.5 text-xs">
+                    <div className="flex justify-between items-center">
+                      <span className="text-muted-foreground font-medium">Customer Name:</span>
+                      <span className="font-bold text-foreground text-sm">{viewComplaint.customers?.name || 'Valued Customer'}</span>
+                    </div>
 
-            {viewComplaint.notes && (
-              <div className="mt-6">
-                <label className={labelClass}>Resolution Note</label>
-                <div className="p-4 rounded-xl bg-emerald-50 text-sm text-emerald-900 border border-emerald-100 leading-relaxed font-medium">
-                  {viewComplaint.notes}
-                </div>
-              </div>
-            )}
-
-            {viewComplaint.attachments && viewComplaint.attachments.length > 0 && (
-              <div className="mt-6">
-                <label className={labelClass}>Attachments ({viewComplaint.attachments.length})</label>
-                <div className="grid grid-cols-2 gap-3 mt-2">
-                  {viewComplaint.attachments
-                    .filter((att: string) => typeof att === 'string' && att.trim() !== "" && att !== "[" && att !== "]")
-                    .map((att: string, i: number) => {
-                      const [name, rawUrl] = att.includes('|') ? att.split('|') : [null, att];
-                      const baseUrl = import.meta.env.VITE_API_URL ?? '';
-
-                      // Ensure URL starts with /uploads/ if it's just a filename
-                      let url = rawUrl;
-                      if (url && !url.startsWith('http') && !url.startsWith('/uploads/') && !url.startsWith('uploads/')) {
-                        url = `/uploads/${url}`;
-                      }
-
-                      const fullUrl = url?.startsWith('http') ? url : `${baseUrl}${url?.startsWith('/') ? '' : '/'}${url}`;
-
-                      return (
-                        <a key={i} href={fullUrl} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 p-3 rounded-xl border border-border bg-card hover:bg-muted/30 transition-all group">
-                          {att.toLowerCase().includes('.pdf') || (name && name.toLowerCase().includes('.pdf')) ? <FileText className="w-4 h-4 text-primary" /> : <Paperclip className="w-4 h-4 text-primary group-hover:scale-110 transition-transform" />}
-                          <span className="text-[10px] font-bold truncate flex-1 uppercase tracking-tight">{name || `Attachment ${i + 1}`}</span>
+                    <div className="flex justify-between items-center">
+                      <span className="text-muted-foreground font-medium flex items-center gap-1">
+                        <Phone className="w-3 h-3 text-primary" /> Contact Phone:
+                      </span>
+                      {viewComplaint.customers?.phone ? (
+                        <a href={`tel:${viewComplaint.customers.phone}`} className="font-bold text-primary hover:underline">
+                          {viewComplaint.customers.phone}
                         </a>
-                      );
-                    })}
+                      ) : <span className="text-muted-foreground">—</span>}
+                    </div>
+
+                    <div className="flex justify-between items-center">
+                      <span className="text-muted-foreground font-medium flex items-center gap-1">
+                        <Mail className="w-3 h-3 text-primary" /> Email Address:
+                      </span>
+                      {viewComplaint.customers?.email ? (
+                        <a href={`mailto:${viewComplaint.customers.email}`} className="font-semibold text-foreground hover:underline truncate max-w-[200px]">
+                          {viewComplaint.customers.email}
+                        </a>
+                      ) : <span className="text-muted-foreground">Not provided</span>}
+                    </div>
+
+                    <div className="flex justify-between items-start pt-1 border-t border-border/50">
+                      <span className="text-muted-foreground font-medium flex items-center gap-1 mt-0.5">
+                        <MapPin className="w-3 h-3 text-primary" /> Address:
+                      </span>
+                      <span className="text-right text-foreground font-medium max-w-[220px]">
+                        {viewComplaint.customers?.address || 'No street address'}
+                        {viewComplaint.customers?.city ? `, ${viewComplaint.customers.city}` : ''}
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Customer Quick Stats */}
+                  <div className="pt-3 border-t border-border flex items-center justify-between text-[11px] text-muted-foreground">
+                    <span>Other Complaints: <b className="text-foreground">{customerHistory.complaints.length}</b></span>
+                    <span>Total Invoices: <b className="text-foreground">{customerHistory.invoices.length}</b></span>
+                  </div>
                 </div>
+
+                {/* Complaint Specifications Card */}
+                <div className="p-5 rounded-2xl bg-muted/20 border border-border space-y-4">
+                  <div className="flex items-center justify-between pb-2 border-b border-border/60">
+                    <h4 className="text-xs font-black uppercase tracking-widest text-primary flex items-center gap-2">
+                      <Wrench className="w-4 h-4" /> Service Specifications
+                    </h4>
+                    <span className="text-[10px] font-bold text-muted-foreground uppercase">
+                      Branch: {viewComplaint.branches?.name || 'Main Branch'}
+                    </span>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-3 text-xs">
+                    <div className="p-2.5 rounded-xl bg-card border border-border/60">
+                      <span className="text-[10px] font-bold uppercase text-muted-foreground block">Service Type</span>
+                      <span className="font-bold text-foreground capitalize mt-0.5 block">{viewComplaint.complaint_type || 'Repair'}</span>
+                    </div>
+
+                    <div className="p-2.5 rounded-xl bg-card border border-border/60">
+                      <span className="text-[10px] font-bold uppercase text-muted-foreground block">Warranty Status</span>
+                      <span className="font-bold text-foreground capitalize mt-0.5 block">{viewComplaint.warranty_type?.replace(/_/g, ' ') || 'Non Warranty'}</span>
+                    </div>
+
+                    <div className="p-2.5 rounded-xl bg-card border border-border/60 col-span-2">
+                      <div className="flex items-center justify-between">
+                        <span className="text-[10px] font-bold uppercase text-muted-foreground">Serial Number</span>
+                        {viewComplaint.serial_number && (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              navigator.clipboard.writeText(viewComplaint.serial_number);
+                              setCopiedSerial(true);
+                              setTimeout(() => setCopiedSerial(false), 2000);
+                            }}
+                            className="text-[10px] text-primary hover:underline font-bold flex items-center gap-1"
+                          >
+                            {copiedSerial ? <><Check className="w-3 h-3 text-emerald-600" /> Copied</> : <><Copy className="w-3 h-3" /> Copy</>}
+                          </button>
+                        )}
+                      </div>
+                      <span className="font-mono font-bold text-foreground text-sm tracking-wide mt-0.5 block">
+                        {viewComplaint.serial_number || '— (No serial registered)'}
+                      </span>
+                    </div>
+
+                    <div className="p-2.5 rounded-xl bg-card border border-border/60">
+                      <span className="text-[10px] font-bold uppercase text-muted-foreground block">Assigned Technician</span>
+                      <span className="font-bold text-foreground mt-0.5 block truncate">{viewComplaint.staff?.full_name || 'Unassigned'}</span>
+                    </div>
+
+                    <div className="p-2.5 rounded-xl bg-card border border-border/60">
+                      <span className="text-[10px] font-bold uppercase text-muted-foreground block">Assigned Helper</span>
+                      <span className="font-bold text-foreground mt-0.5 block truncate">{viewComplaint.helper?.full_name || 'None'}</span>
+                    </div>
+                  </div>
+                </div>
+
               </div>
-            )}
+
+              {/* Row 2: Reported Issue & Resolution Notes */}
+              <div className="space-y-4">
+                <div>
+                  <label className={labelClass}>Customer Problem Description</label>
+                  <div className="p-4 rounded-2xl bg-card border border-border text-sm text-foreground leading-relaxed shadow-sm italic">
+                    "{viewComplaint.description}"
+                  </div>
+                </div>
+
+                {viewComplaint.notes && (
+                  <div>
+                    <label className={labelClass}>Technical Remarks & Resolution Notes</label>
+                    <div className="p-4 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-950 dark:text-emerald-200 text-sm leading-relaxed font-medium">
+                      {viewComplaint.notes}
+                    </div>
+                  </div>
+                )}
+
+                {/* Attachments */}
+                {viewComplaint.attachments && viewComplaint.attachments.length > 0 && (
+                  <div>
+                    <label className={labelClass}>Attached Files & Photos ({viewComplaint.attachments.length})</label>
+                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 mt-1.5">
+                      {viewComplaint.attachments
+                        .filter((att: string) => typeof att === 'string' && att.trim() !== "" && att !== "[" && att !== "]")
+                        .map((att: string, i: number) => {
+                          const [name, rawUrl] = att.includes('|') ? att.split('|') : [null, att];
+                          const baseUrl = import.meta.env.VITE_API_URL ?? '';
+                          let url = rawUrl;
+                          if (url && !url.startsWith('http') && !url.startsWith('/uploads/') && !url.startsWith('uploads/')) {
+                            url = `/uploads/${url}`;
+                          }
+                          const fullUrl = url?.startsWith('http') ? url : `${baseUrl}${url?.startsWith('/') ? '' : '/'}${url}`;
+
+                          return (
+                            <a 
+                              key={i} 
+                              href={fullUrl} 
+                              target="_blank" 
+                              rel="noopener noreferrer" 
+                              className="flex items-center gap-2.5 p-3 rounded-xl border border-border bg-card hover:bg-muted/40 transition-all group"
+                            >
+                              <Paperclip className="w-4 h-4 text-primary group-hover:scale-110 transition-transform" />
+                              <span className="text-xs font-bold text-foreground truncate flex-1 uppercase tracking-tight">
+                                {name || `File ${i + 1}`}
+                              </span>
+                              <ArrowUpRight className="w-3.5 h-3.5 text-muted-foreground group-hover:text-primary transition-colors" />
+                            </a>
+                          );
+                        })}
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Row 3: Complete Customer History Section */}
+              <div className="pt-6 border-t border-border space-y-4">
+                <div className="flex items-center justify-between flex-wrap gap-2">
+                  <div className="flex items-center gap-2">
+                    <History className="w-4 h-4 text-primary" />
+                    <h4 className="text-xs font-black uppercase tracking-widest text-foreground">
+                      Customer Service & Billing History
+                    </h4>
+                  </div>
+
+                  {/* Tabs */}
+                  <div className="flex items-center bg-muted p-1 rounded-xl text-xs font-bold">
+                    <button
+                      type="button"
+                      onClick={() => setActiveHistoryTab('complaints')}
+                      className={`px-3 py-1 rounded-lg transition-all ${activeHistoryTab === 'complaints' ? 'bg-card text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'}`}
+                    >
+                      Past Complaints ({customerHistory.complaints.length})
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setActiveHistoryTab('invoices')}
+                      className={`px-3 py-1 rounded-lg transition-all ${activeHistoryTab === 'invoices' ? 'bg-card text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'}`}
+                    >
+                      Invoices ({customerHistory.invoices.length})
+                    </button>
+                  </div>
+                </div>
+
+                {/* History Content */}
+                {loadingHistory ? (
+                  <div className="py-8 text-center text-xs text-muted-foreground animate-pulse flex items-center justify-center gap-2">
+                    <Clock className="w-4 h-4 animate-spin" /> Loading customer history records...
+                  </div>
+                ) : activeHistoryTab === 'complaints' ? (
+                  customerHistory.complaints.length === 0 ? (
+                    <div className="p-6 rounded-2xl bg-muted/20 border border-dashed border-border text-center text-xs text-muted-foreground">
+                      No other complaints found for this customer.
+                    </div>
+                  ) : (
+                    <div className="rounded-2xl border border-border overflow-hidden bg-card text-xs">
+                      <table className="w-full">
+                        <thead className="bg-muted/50 border-b border-border text-muted-foreground uppercase text-[10px]">
+                          <tr>
+                            <th className="px-4 py-2.5 text-left font-bold">Complaint #</th>
+                            <th className="px-4 py-2.5 text-left font-bold">Date</th>
+                            <th className="px-4 py-2.5 text-left font-bold">Type</th>
+                            <th className="px-4 py-2.5 text-left font-bold">Serial #</th>
+                            <th className="px-4 py-2.5 text-left font-bold">Status</th>
+                            <th className="px-4 py-2.5 text-right font-bold">Action</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-border">
+                          {customerHistory.complaints.map((c: any) => (
+                            <tr key={c.id} className="hover:bg-muted/20 transition-colors">
+                              <td className="px-4 py-2.5 font-bold text-primary font-mono">{c.complaint_number}</td>
+                              <td className="px-4 py-2.5 text-muted-foreground">{c.created_at ? new Date(c.created_at).toLocaleDateString() : '—'}</td>
+                              <td className="px-4 py-2.5 capitalize">{c.complaint_type || 'Repair'}</td>
+                              <td className="px-4 py-2.5 font-mono text-muted-foreground">{c.serial_number || '—'}</td>
+                              <td className="px-4 py-2.5">
+                                <span className={`px-2 py-0.5 rounded-full text-[9px] font-bold uppercase ${statusColors[c.status] || "bg-muted text-muted-foreground"}`}>
+                                  {c.status?.replace(/_/g, ' ')}
+                                </span>
+                              </td>
+                              <td className="px-4 py-2.5 text-right">
+                                <button
+                                  type="button"
+                                  onClick={() => openViewComplaint(c)}
+                                  className="text-primary hover:underline font-bold text-[11px]"
+                                >
+                                  View
+                                </button>
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  )
+                ) : (
+                  customerHistory.invoices.length === 0 ? (
+                    <div className="p-6 rounded-2xl bg-muted/20 border border-dashed border-border text-center text-xs text-muted-foreground">
+                      No invoices found for this customer.
+                    </div>
+                  ) : (
+                    <div className="rounded-2xl border border-border overflow-hidden bg-card text-xs">
+                      <table className="w-full">
+                        <thead className="bg-muted/50 border-b border-border text-muted-foreground uppercase text-[10px]">
+                          <tr>
+                            <th className="px-4 py-2.5 text-left font-bold">Invoice #</th>
+                            <th className="px-4 py-2.5 text-left font-bold">Date</th>
+                            <th className="px-4 py-2.5 text-left font-bold">Amount</th>
+                            <th className="px-4 py-2.5 text-left font-bold">Status</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-border">
+                          {customerHistory.invoices.map((inv: any) => (
+                            <tr key={inv.id} className="hover:bg-muted/20 transition-colors">
+                              <td className="px-4 py-2.5 font-bold text-foreground font-mono">{inv.invoice_number}</td>
+                              <td className="px-4 py-2.5 text-muted-foreground">{inv.issued_at ? new Date(inv.issued_at).toLocaleDateString() : (inv.created_at ? new Date(inv.created_at).toLocaleDateString() : '—')}</td>
+                              <td className="px-4 py-2.5 font-bold text-foreground">Rs. {Number(inv.total_amount || 0).toLocaleString()}</td>
+                              <td className="px-4 py-2.5">
+                                <span className={`px-2 py-0.5 rounded-full text-[9px] font-bold uppercase ${inv.payment_status === 'paid' ? 'bg-emerald-100 text-emerald-800' : 'bg-rose-100 text-rose-800'}`}>
+                                  {inv.payment_status || 'unpaid'}
+                                </span>
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  )
+                )}
+              </div>
+
+            </div>
           </div>
         </div>
       )}

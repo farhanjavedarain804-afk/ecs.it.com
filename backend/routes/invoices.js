@@ -150,9 +150,29 @@ router.get('/:id', auth(), async (req, res) => {
             }];
         }
 
+        // Ensure clean, normalized item fields so neither undefined nor NaN ever occurs
+        const normalizedItems = (items || []).map(it => {
+            const rawQty = it.qty !== undefined ? it.qty : (it.quantity !== undefined ? it.quantity : 1);
+            const qty = isNaN(Number(rawQty)) || Number(rawQty) <= 0 ? 1 : Number(rawQty);
+            const rawPrice = it.unitPrice !== undefined ? it.unitPrice : (it.unit_price !== undefined ? it.unit_price : (it.rate !== undefined ? it.rate : (it.price !== undefined ? it.price : 0)));
+            const unitPrice = isNaN(Number(rawPrice)) ? 0 : Number(rawPrice);
+            const rawAmount = it.amount !== undefined ? it.amount : (it.total_price !== undefined ? it.total_price : (qty * unitPrice));
+            const amount = isNaN(Number(rawAmount)) ? (qty * unitPrice) : Number(rawAmount);
+            return {
+                ...it,
+                description: it.description || 'Service Work',
+                qty,
+                quantity: qty,
+                unitPrice,
+                unit_price: unitPrice,
+                amount,
+                total_price: amount
+            };
+        });
+
         const result = {
             ...row,
-            items,
+            items: normalizedItems,
             customers: { id: row.customer_id, name: row.customer_name, address: row.customer_address, phone: row.customer_phone, email: row.customer_email },
             branches: { id: row.branch_id, name: row.branch_name, address: row.branch_address, branch_code: row.branch_code },
             complaints: row.complaint_id ? { id: row.complaint_id, complaint_number: row.complaint_number } : null,

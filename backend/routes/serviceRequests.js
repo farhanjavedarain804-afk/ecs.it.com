@@ -58,6 +58,12 @@ router.post('/public', async (req, res) => {
         if (!colNames.includes('status')) {
             await pool.query("ALTER TABLE service_requests ADD COLUMN status VARCHAR(50) DEFAULT 'pending'");
         }
+        if (!colNames.includes('converted_complaint_id')) {
+            await pool.query("ALTER TABLE service_requests ADD COLUMN converted_complaint_id VARCHAR(36) DEFAULT NULL");
+        }
+        if (!colNames.includes('converted_complaint_number')) {
+            await pool.query("ALTER TABLE service_requests ADD COLUMN converted_complaint_number VARCHAR(50) DEFAULT NULL");
+        }
         
         const insertFields = ['id', 'name', 'phone', 'status'];
         const insertValues = [id, name.trim(), phone.trim(), 'pending'];
@@ -131,6 +137,12 @@ router.get('/', auth(), async (req, res) => {
         if (!colNames.includes('status')) {
             await pool.query("ALTER TABLE service_requests ADD COLUMN status VARCHAR(50) DEFAULT 'pending'");
         }
+        if (!colNames.includes('converted_complaint_id')) {
+            await pool.query("ALTER TABLE service_requests ADD COLUMN converted_complaint_id VARCHAR(36) DEFAULT NULL");
+        }
+        if (!colNames.includes('converted_complaint_number')) {
+            await pool.query("ALTER TABLE service_requests ADD COLUMN converted_complaint_number VARCHAR(50) DEFAULT NULL");
+        }
 
         const dbBranchCol = colNames.includes('city_branch') ? 'city_branch' : (colNames.includes('branch') ? 'branch' : (colNames.includes('city') ? 'city' : 'city_branch'));
 
@@ -172,23 +184,49 @@ router.get('/', auth(), async (req, res) => {
 });
 
 // @route   PUT /api/service-requests/:id
-// @desc    Update a service request status
+// @desc    Update a service request status & link complaint (locked once converted)
 // @access  Private
 router.put('/:id', auth(), async (req, res) => {
     try {
-        const { status } = req.body;
+        const { status, converted_complaint_id, converted_complaint_number } = req.body;
         if (!status) {
             return res.status(400).json({ error: 'Status is required' });
         }
 
+        // Check if already locked as converted
+        const [existing] = await pool.query('SELECT status, converted_complaint_number FROM service_requests WHERE id = ?', [req.params.id]);
+        if (existing.length === 0) {
+            return res.status(404).json({ error: 'Service request not found' });
+        }
+
+        if (existing[0].status === 'converted_to_complaint') {
+            return res.status(400).json({ 
+                error: 'This service request is already converted to a complaint and locked. Status cannot be modified.',
+                is_locked: true,
+                converted_complaint_number: existing[0].converted_complaint_number
+            });
+        }
+
+        // Ensure columns exist before update
+        try {
+            const [columns] = await pool.query("SHOW COLUMNS FROM service_requests LIKE 'converted_complaint_number'");
+            if (columns.length === 0) {
+                await pool.query("ALTER TABLE service_requests ADD COLUMN converted_complaint_id VARCHAR(36) DEFAULT NULL, ADD COLUMN converted_complaint_number VARCHAR(50) DEFAULT NULL");
+            }
+        } catch (e) {}
+
         await pool.query(
-            'UPDATE service_requests SET status = ? WHERE id = ?',
-            [status, req.params.id]
+            'UPDATE service_requests SET status = ?, converted_complaint_id = COALESCE(?, converted_complaint_id), converted_complaint_number = COALESCE(?, converted_complaint_number) WHERE id = ?',
+            [status, converted_complaint_id || null, converted_complaint_number || null, req.params.id]
         );
 
-        res.json({ success: true });
+        res.json({ 
+            success: true, 
+            status, 
+            converted_complaint_number: converted_complaint_number || existing[0].converted_complaint_number 
+        });
     } catch (err) {
-        console.error(err);
+        console.error('Service request update error:', err);
         res.status(500).json({ error: 'Server error' });
     }
 });

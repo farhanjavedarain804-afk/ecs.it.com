@@ -351,10 +351,18 @@ export const generatePDF = async (type: 'welcome_note' | 'complaint_receipt' | '
                 doc.setFillColor(245, 247, 250);
                 doc.rect(15, y, pageWidth - 30, rowHeight, 'F');
             }
-            doc.text(String(item.description), 18, y + 5);
-            doc.text(String(item.qty), pageWidth - 75, y + 5, { align: "center" });
-            doc.text(Number(item.unitPrice).toLocaleString(), pageWidth - 45, y + 5, { align: "right" });
-            doc.text((item.qty * item.unitPrice).toLocaleString(), pageWidth - 18, y + 5, { align: "right" });
+            const desc = String(item.description || item.name || "Service / Product");
+            const rawQty = item.qty !== undefined ? item.qty : (item.quantity !== undefined ? item.quantity : 1);
+            const qty = isNaN(Number(rawQty)) || Number(rawQty) <= 0 ? 1 : Number(rawQty);
+            const rawPrice = item.unitPrice !== undefined ? item.unitPrice : (item.unit_price !== undefined ? item.unit_price : (item.rate !== undefined ? item.rate : (item.price !== undefined ? item.price : 0)));
+            const unitPrice = isNaN(Number(rawPrice)) ? 0 : Number(rawPrice);
+            const rawAmount = item.amount !== undefined ? item.amount : (item.total_price !== undefined ? item.total_price : (qty * unitPrice));
+            const amount = isNaN(Number(rawAmount)) ? (qty * unitPrice) : Number(rawAmount);
+
+            doc.text(desc, 18, y + 5);
+            doc.text(String(qty), pageWidth - 75, y + 5, { align: "center" });
+            doc.text(unitPrice.toLocaleString(), pageWidth - 45, y + 5, { align: "right" });
+            doc.text(amount.toLocaleString(), pageWidth - 18, y + 5, { align: "right" });
             y += rowHeight;
         });
 

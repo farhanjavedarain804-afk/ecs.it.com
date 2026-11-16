@@ -3,7 +3,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useToast } from "@/hooks/use-toast";
 import { format } from "date-fns";
 import { 
-  Search, Loader2, Phone, Mail, CheckCircle2, Trash2, 
+  Search, Lock, Loader2, Phone, Mail, CheckCircle2, Trash2, 
   AlertCircle, Eye, Hash, MapPin, Tag, User, FileText, 
   Clock, Filter, XCircle, ArrowRightCircle
 } from "lucide-react";
@@ -33,6 +33,8 @@ const ServiceRequests = () => {
   // Convert to Complaint Modal State
   const [convertingReq, setConvertingReq] = useState<any | null>(null);
   const [submittingComplaint, setSubmittingComplaint] = useState(false);
+  const [existingCustomer, setExistingCustomer] = useState<any | null>(null);
+  const [lookingUpCustomer, setLookingUpCustomer] = useState(false);
   const [convertForm, setConvertForm] = useState({
     name: "",
     phone: "",
@@ -86,7 +88,7 @@ const ServiceRequests = () => {
     fetchAuxData();
   }, []);
 
-  const openConvertModal = (req: any) => {
+  const openConvertModal = async (req: any) => {
     // Detect matched branch
     let matchedBranchId = "";
     if (req.branch_id && branches.some(b => b.id === req.branch_id)) {
@@ -123,7 +125,45 @@ const ServiceRequests = () => {
       description: req.service_required ? `[Service Request ${req.id}]: ${req.service_required}` : "",
     });
 
+    setExistingCustomer(null);
     setConvertingReq(req);
+
+    // Fast automatic lookup for existing customer by phone or email
+    if (req.phone || req.email) {
+      setLookingUpCustomer(true);
+      try {
+        const queryParams = new URLSearchParams();
+        if (req.phone) queryParams.set("phone", req.phone.trim());
+        if (req.email) queryParams.set("email", req.email.trim());
+
+        const lookupRes = await fetch(`${API_URL}/api/customers/lookup?${queryParams.toString()}`, {
+          headers: { Authorization: `Bearer ${localStorage.getItem("ecs_token")}` }
+        });
+        if (lookupRes.ok) {
+          const lData = await lookupRes.json();
+          if (lData.found && lData.customer) {
+            const cust = lData.customer;
+            setExistingCustomer(cust);
+            setConvertForm(prev => ({
+              ...prev,
+              name: cust.name || prev.name,
+              phone: cust.phone || prev.phone,
+              email: cust.email || prev.email,
+              address: cust.address || prev.address,
+              branch_id: cust.branch_id || prev.branch_id
+            }));
+            toast({
+              title: "Existing Customer Found",
+              description: `Linked to ${cust.name} (${cust.customer_id || cust.phone}). No duplicate will be created.`
+            });
+          }
+        }
+      } catch (e) {
+        console.error("Lookup error:", e);
+      } finally {
+        setLookingUpCustomer(false);
+      }
+    }
   };
 
   const handleStatusChange = async (req: any, newStatus: string) => {
@@ -392,28 +432,37 @@ const ServiceRequests = () => {
                           <Eye className="w-3.5 h-3.5" /> View
                         </Button>
 
-                        {/* Custom 4 Options: pending, contacted, converted_to_complaint, rejected */}
-                        <select
-                          className="text-xs bg-background border border-border rounded-md px-2 py-1.5 focus:outline-none focus:ring-1 focus:ring-primary cursor-pointer font-medium"
-                          value={req.status}
-                          onChange={(e) => handleStatusChange(req, e.target.value)}
-                        >
-                          <option value="pending">Pending</option>
-                          <option value="contacted">Contacted</option>
-                          <option value="converted_to_complaint">Converted</option>
-                          <option value="rejected">Rejected</option>
-                        </select>
-
-                        {req.status !== "converted_to_complaint" && (
-                          <Button
-                            variant="default"
-                            size="sm"
-                            onClick={() => openConvertModal(req)}
-                            className="h-8 gap-1 text-xs bg-emerald-600 hover:bg-emerald-700 text-white font-semibold"
-                            title="Register complaint from this request"
+                        {req.status === "converted_to_complaint" ? (
+                          <div 
+                            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800 text-xs font-bold shadow-sm"
+                            title="Request is converted and permanently locked"
                           >
-                            <ArrowRightCircle className="w-3.5 h-3.5" /> Convert
-                          </Button>
+                            <Lock className="w-3.5 h-3.5 text-emerald-600" />
+                            <span>Converted {req.converted_complaint_number ? `#${req.converted_complaint_number}` : ''}</span>
+                          </div>
+                        ) : (
+                          <>
+                            <select
+                              className="text-xs bg-background border border-border rounded-md px-2 py-1.5 focus:outline-none focus:ring-1 focus:ring-primary cursor-pointer font-medium"
+                              value={req.status}
+                              onChange={(e) => handleStatusChange(req, e.target.value)}
+                            >
+                              <option value="pending">Pending</option>
+                              <option value="contacted">Contacted</option>
+                              <option value="converted_to_complaint">Converted</option>
+                              <option value="rejected">Rejected</option>
+                            </select>
+
+                            <Button
+                              variant="default"
+                              size="sm"
+                              onClick={() => openConvertModal(req)}
+                              className="h-8 gap-1 text-xs bg-emerald-600 hover:bg-emerald-700 text-white font-semibold shadow-sm"
+                              title="Register complaint from this request"
+                            >
+                              <ArrowRightCircle className="w-3.5 h-3.5" /> Convert
+                            </Button>
+                          </>
                         )}
 
                         {(hasRole("super_admin") || hasRole("developer")) && (
@@ -520,6 +569,27 @@ const ServiceRequests = () => {
             </div>
 
             <form onSubmit={handleRegisterComplaint} className="space-y-6">
+              {lookingUpCustomer ? (
+                <div className="flex items-center gap-2 p-3 bg-primary/5 rounded-xl border border-primary/20 text-xs text-primary font-medium animate-pulse">
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                  Searching customer database for existing profile...
+                </div>
+              ) : existingCustomer ? (
+                <div className="flex items-center justify-between p-3.5 bg-emerald-50 dark:bg-emerald-950/30 rounded-2xl border border-emerald-200 dark:border-emerald-800 text-xs shadow-sm">
+                  <div className="flex items-center gap-2.5 text-emerald-800 dark:text-emerald-300 font-semibold">
+                    <CheckCircle2 className="w-5 h-5 text-emerald-600 shrink-0" />
+                    <div>
+                      <p className="font-bold text-emerald-900 dark:text-emerald-200">Existing Customer Account Matched!</p>
+                      <p className="text-[11px] text-emerald-700 dark:text-emerald-400 font-normal">
+                        <b>{existingCustomer.name}</b> ({existingCustomer.customer_id || existingCustomer.phone}) — Complaint will register directly to this customer.
+                      </p>
+                    </div>
+                  </div>
+                  <span className="px-2.5 py-1 rounded-lg bg-emerald-200 dark:bg-emerald-900 text-emerald-900 dark:text-emerald-100 text-[10px] font-black uppercase tracking-wider">
+                    Auto-Linked
+                  </span>
+                </div>
+              ) : null}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-6">
                 {/* Left Side: Customer Info (Pre-filled from request) */}
                 <div className="space-y-4">

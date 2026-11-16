@@ -51,6 +51,52 @@ router.get('/', auth(), async (req, res) => {
     }
 });
 
+
+// @route   GET /api/customers/lookup
+// @desc    Fast customer lookup by phone or email for service requests / conversions
+router.get('/lookup', auth(), async (req, res) => {
+    try {
+        const { phone, email } = req.query;
+        if (!phone && !email) {
+            return res.status(400).json({ error: 'Phone or email required for lookup' });
+        }
+
+        let query = `
+            SELECT c.*, b.name as branch_name, b.city as branch_city
+            FROM customers c
+            LEFT JOIN branches b ON c.branch_id = b.id
+            WHERE 1=0
+        `;
+        let params = [];
+
+        if (phone && phone.trim()) {
+            const cleanPhone = phone.trim();
+            // Match exact phone or matching last 7 digits
+            const digitsOnly = cleanPhone.replace(/\D/g, '');
+            const suffix = digitsOnly.length >= 7 ? digitsOnly.slice(-7) : cleanPhone;
+            query += ' OR c.phone = ? OR c.phone LIKE ?';
+            params.push(cleanPhone, '%' + suffix);
+        }
+
+        if (email && email.trim()) {
+            query += ' OR LOWER(c.email) = ?';
+            params.push(email.trim().toLowerCase());
+        }
+
+        query += ' ORDER BY c.created_at DESC LIMIT 1';
+
+        const [rows] = await pool.query(query, params);
+        if (rows.length > 0) {
+            return res.json({ found: true, customer: rows[0] });
+        }
+
+        res.json({ found: false });
+    } catch (err) {
+        console.error('Customer Lookup Error:', err);
+        res.status(500).json({ error: 'Lookup failed' });
+    }
+});
+
 // @route   POST /api/customers
 // @desc    Add new customer
 router.post('/', auth(), async (req, res) => {
@@ -76,14 +122,17 @@ router.post('/', auth(), async (req, res) => {
         // A customer is considered duplicate if they have the same phone number
         // in the same branch.
         const [existing] = await pool.query(
-            'SELECT id, customer_id, name FROM customers WHERE phone = ? AND branch_id = ? LIMIT 1',
-            [phone, finalBranchId]
+            'SELECT id, customer_id, name, phone, email, address, city, branch_id FROM customers WHERE phone = ? LIMIT 1',
+            [phone.trim()]
         );
         if (existing.length > 0) {
             return res.status(409).json({
-                error: `Customer already exists with this phone number in this branch.`,
+                error: `Customer already exists with this phone number.`,
+                id: existing[0].id,
+                customer_id: existing[0].customer_id,
                 existing_customer_id: existing[0].customer_id,
-                existing_name: existing[0].name
+                existing_name: existing[0].name,
+                customer: existing[0]
             });
         }
         // ────────────────────────────────────────────────────────────────────

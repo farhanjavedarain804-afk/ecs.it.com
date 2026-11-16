@@ -4,7 +4,7 @@ import { useSearchParams, useNavigate, Link } from "react-router-dom";
 import {
   ShieldCheck, Search, ScanLine, FileText, ClipboardList,
   User, Building2, BadgeCheck, AlertCircle, ArrowLeft, X,
-  Globe, Phone, CheckCircle2, Download, ChevronDown, ChevronUp,
+  Globe, Phone, CheckCircle2, Download, ArrowRightCircle, ChevronDown, ChevronUp,
   CreditCard, Calendar, MapPin, Hash, Banknote, Tag
 } from "lucide-react";
 import { useParams } from "react-router-dom";
@@ -194,6 +194,7 @@ const getDetailFields = (result: any) => {
         { label: "Customer Name", value: d.customer },
         { label: "Service Required", value: d.service },
         { label: "Status", value: d.status, isStatus: true },
+        ...(d.converted_complaint_number ? [{ label: "Converted Complaint #", value: `#${d.converted_complaint_number} (Active Official Complaint)` }] : []),
         { label: "Registration Date", value: d.date ? fmt(d.date) : "—" },
         { label: "Assigned Branch", value: d.branch },
         ...(d.phone ? [{ label: "Customer Phone", value: maskPhone(d.phone) }] : []),
@@ -545,6 +546,45 @@ const PublicVerify = ({ onClose, overrideId }: { onClose?: () => void, overrideI
                       {typeIcons[result.type]}
                     </div>
                   </div>
+
+                  {/* Converted Service Request Live Notice */}
+                  {result.type === "service_request" && (result.data.is_converted || result.data.status === "converted_to_complaint" || result.data.converted_complaint_number) && (
+                    <div className="p-5 rounded-2xl bg-gradient-to-br from-amber-500/15 to-orange-500/10 border-2 border-amber-500/30 shadow-md">
+                      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+                        <div className="flex items-start gap-3">
+                          <div className="w-10 h-10 rounded-xl bg-amber-500/20 text-amber-600 flex items-center justify-center shrink-0 mt-0.5">
+                            <ArrowRightCircle className="w-6 h-6" />
+                          </div>
+                          <div>
+                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-800 text-[10px] font-black uppercase tracking-wider mb-1">
+                              Status: Converted to Official Complaint
+                            </span>
+                            <h4 className="text-sm font-black text-slate-800">
+                              Aap ki service request official complaint mein convert ho chuki hai
+                            </h4>
+                            <p className="text-xs text-slate-600 mt-1 leading-relaxed">
+                              {result.data.message || `Please active Complaint Number #${result.data.converted_complaint_number || 'Direct'} ke zariye track karein.`}
+                            </p>
+                          </div>
+                        </div>
+                        {result.data.converted_complaint_number && (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const target = result.data.converted_complaint_number;
+                              setInput(target);
+                              navigate(`/verify?id=${target}`);
+                              performVerification(target);
+                            }}
+                            className="w-full sm:w-auto px-5 py-3 bg-amber-600 hover:bg-amber-700 text-white rounded-xl font-black text-xs uppercase tracking-wider shadow-md transition-all active:scale-95 flex items-center justify-center gap-2 shrink-0"
+                          >
+                            <Search className="w-3.5 h-3.5" />
+                            Track Complaint #{result.data.converted_complaint_number}
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  )}
 
                   {/* Summary fields */}
                   <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">

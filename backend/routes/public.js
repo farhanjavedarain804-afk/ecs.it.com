@@ -163,6 +163,12 @@ router.get('/verify/:id', async (req, res) => {
             );
             if (sr.length > 0) {
                 const row = sr[0];
+                const compNum = row.converted_complaint_number || null;
+                const isConverted = row.status === 'converted_to_complaint' || Boolean(compNum);
+                const message = isConverted 
+                    ? `Aap ki service request official complaint (${compNum || 'In Process'}) mein convert ho chuki hai. Please complaint number se track karein.` 
+                    : null;
+
                 return res.json({
                     type: 'service_request',
                     verified: true,
@@ -174,7 +180,11 @@ router.get('/verify/:id', async (req, res) => {
                         service: row.service_required || row.service || '',
                         phone: row.phone,
                         email: row.email || '',
-                        date: row.created_at
+                        date: row.created_at,
+                        is_converted: isConverted,
+                        converted_complaint_number: compNum,
+                        converted_complaint_id: row.converted_complaint_id || null,
+                        message: message
                     }
                 });
             }
