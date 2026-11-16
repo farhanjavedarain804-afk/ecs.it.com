@@ -243,10 +243,8 @@ const sendMail = async ({ to, subject, html, attachments = [] }) => {
             messageId: msgId,
             headers: {
                 'X-Mailer': 'ECS-Portal/2.0',
-                'X-Priority': '3',
                 'Auto-Submitted': 'auto-generated',
-                'X-Auto-Response-Suppress': 'OOF, AutoReply',
-                'List-Unsubscribe': `<mailto:${company.email || senderEmail}?subject=Unsubscribe>`
+                'X-Auto-Response-Suppress': 'OOF, AutoReply'
             }
         });
 
@@ -540,7 +538,7 @@ const testSmtpConnection = async (smtpConfig, testRecipient) => {
             from: `"${senderName}" <${senderEmail}>`,
             to: testRecipient,
             replyTo: company.email || senderEmail,
-            subject: `✅ SMTP Test Email - ${company.name}`,
+            subject: `SMTP Verification Test - ${company.name}`,
             text: htmlToPlainText(testHtml),
             html: testHtml,
             headers: {
