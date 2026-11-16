@@ -160,10 +160,10 @@ const buildEmailTemplate = (company, title, bodyContent) => {
             <table width="100%" cellpadding="0" cellspacing="0" border="0" style="background: #0f172a; border-bottom: 3px solid #0284c7;">
                 <tr>
                     <td style="padding: 10px 20px; font-size: 11px; font-weight: 800; color: #38bdf8; text-transform: uppercase; letter-spacing: 1px; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;">
-                        ⚡ OFFICIAL NOTIFICATION • HIGH PRIORITY
+                        OFFICIAL CUSTOMER SERVICE NOTIFICATION
                     </td>
                     <td align="right" style="padding: 10px 20px; font-size: 10px; font-weight: 700; color: #fca5a5; font-family: monospace;">
-                        <span style="background: rgba(220, 38, 38, 0.35); border: 1px solid #ef4444; padding: 3px 8px; border-radius: 4px; text-transform: uppercase;">PRIORITY 1</span>
+                        <span style="background: rgba(220, 38, 38, 0.35); border: 1px solid #ef4444; padding: 3px 8px; border-radius: 4px; text-transform: uppercase;">VERIFIED NOTICE</span>
                     </td>
                 </tr>
             </table>
@@ -254,13 +254,8 @@ const sendMail = async ({ to, subject, html, attachments = [] }) => {
             attachments,
             messageId: msgId,
             headers: {
-                'X-Priority': '1 (Highest)',
-                'Priority': 'Urgent',
-                'Importance': 'High',
-                'X-MSMail-Priority': 'High',
-                'X-Message-Delivery': 'Urgent',
+                'X-Mailer': 'ECS-Portal/2.0',
                 'X-Entity-Ref-ID': msgId,
-                'X-Mailer': 'ECS Enterprise Alert Core/2.0',
                 'Auto-Submitted': 'auto-generated',
                 'X-Auto-Response-Suppress': 'OOF, AutoReply'
             }
@@ -304,7 +299,7 @@ const sendWelcomeEmail = async (customer) => {
         const html = buildEmailTemplate(company, `Welcome to ${company.name}`, bodyContent);
         return await sendMail({
             to: customer.email,
-            subject: `[IMPORTANT] Welcome to ${company.name} - Official Customer Account Confirmation (${customer.customer_id || customer.name})`,
+            subject: `Welcome to ${company.name} - Account Confirmation (${customer.customer_id || customer.name})`,
             html
         });
     } catch (e) {
@@ -355,7 +350,7 @@ const sendComplaintCreatedEmail = async (complaint, customer, branch) => {
         const html = buildEmailTemplate(company, `Complaint #${complaint.complaint_number} Registered`, bodyContent);
         return await sendMail({
             to: toEmail,
-            subject: `[HIGH PRIORITY] Service Complaint Registered: #${complaint.complaint_number} - ${company.name}`,
+            subject: `Service Complaint Registered: #${complaint.complaint_number} - ${company.name}`,
             html
         });
     } catch (e) {
@@ -408,7 +403,7 @@ const sendComplaintStatusEmail = async (complaint, customer, newStatus, notes = 
         const html = buildEmailTemplate(company, `Status Update: Complaint #${complaint.complaint_number}`, bodyContent);
         return await sendMail({
             to: toEmail,
-            subject: `[PRIORITY NOTICE] Complaint #${complaint.complaint_number} Status Update: ${formattedStatus.toUpperCase()} - ${company.name}`,
+            subject: `Complaint #${complaint.complaint_number} Status Update: ${formattedStatus.toUpperCase()} - ${company.name}`,
             html
         });
     } catch (e) {
@@ -517,7 +512,7 @@ const sendInvoiceEmail = async (invoice, customer, items = [], branch = null, pd
 
         return await sendMail({
             to: toEmail,
-            subject: `[IMPORTANT NOTICE] Official Invoice #${invoice.invoice_number} from ${company.name} (PKR ${totalFormatted})`,
+            subject: `Invoice #${invoice.invoice_number} from ${company.name} (PKR ${totalFormatted})`,
             html,
             attachments
         });
@@ -556,16 +551,12 @@ const testSmtpConnection = async (smtpConfig, testRecipient) => {
             from: `"${senderName}" <${senderEmail}>`,
             to: testRecipient,
             replyTo: company.email || senderEmail,
-            subject: `[HIGH PRIORITY] System Verification Test Notification - ${company.name}`,
+            subject: `Service Verification Test - ${company.name}`,
             text: htmlToPlainText(testHtml),
             html: testHtml,
             headers: {
-                'X-Priority': '1 (Highest)',
-                'Priority': 'Urgent',
-                'Importance': 'High',
-                'X-MSMail-Priority': 'High',
-                'X-Message-Delivery': 'Urgent',
-                'X-Mailer': 'ECS Enterprise Alert Core/2.0',
+                'X-Mailer': 'ECS-Portal/2.0',
+                'X-Entity-Ref-ID': msgId,
                 'Auto-Submitted': 'auto-generated',
                 'X-Auto-Response-Suppress': 'OOF, AutoReply'
             }
