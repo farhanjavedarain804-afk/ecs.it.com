@@ -85,7 +85,7 @@ const getResultFields = (result: any) => {
         { icon: User, label: "Employee", value: d.staff },
         { icon: Hash, label: "Employee ID", value: d.employee_id },
         { icon: Tag, label: "Designation", value: d.designation },
-        { icon: Banknote, label: "Net Salary", value: `Rs. ${Number(d.amount).toLocaleString()}` },
+        { icon: Banknote, label: "Net Salary", value: typeof d.amount === 'string' && d.amount.includes('*') ? d.amount : `Rs. ${Number(d.amount).toLocaleString()}` },
         { icon: Tag, label: "Status", value: d.status },
         { icon: MapPin, label: "Branch", value: d.branch },
       ];

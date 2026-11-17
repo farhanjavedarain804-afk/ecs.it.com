@@ -51,19 +51,61 @@ const typeIcons: Record<string, React.ReactNode> = {
   service_request: <CheckCircle2 className="w-7 h-7 text-sky-600" />,
 };
 
-const maskPhone = (val?: string) => val ? val.replace(/.(?=.{4})/g, '*') : '—';
 const maskCNIC = (val?: string) => {
   if (!val) return '—';
-  const parts = val.split('-');
-  if (parts.length === 3) return `${parts[0]}-*******-${parts[2]}`;
-  return val.substring(0, 4) + '*******' + val.substring(val.length - 2);
+  const clean = String(val).trim();
+  const parts = clean.split('-');
+  if (parts.length === 3 && parts[1].length >= 7) {
+    // e.g. 32203-99*****-9 as requested
+    return `${parts[0]}-${parts[1].slice(0, 2)}*****-${parts[2]}`;
+  }
+  if (clean.length >= 13) {
+    return `${clean.slice(0, 5)}-${clean.slice(5, 7)}*****-${clean.slice(-1)}`;
+  }
+  if (clean.length > 6) {
+    return clean.slice(0, 4) + '*****' + clean.slice(-2);
+  }
+  return clean;
 };
-const maskAmount = (val?: string | number) => val ? 'Rs. ***,***' : '—';
+
+const maskPhone = (val?: string) => {
+  if (!val) return '—';
+  const s = String(val).trim();
+  if (s.length <= 6) return s;
+  const prefixLen = s.startsWith('+') ? 6 : 4;
+  const suffixLen = 3;
+  const maskedLen = Math.max(4, s.length - prefixLen - suffixLen);
+  return `${s.slice(0, prefixLen)} ${'*'.repeat(maskedLen)} ${s.slice(-suffixLen)}`;
+};
+
 const maskEmail = (val?: string) => {
   if (!val) return '—';
-  const [name, domain] = val.split('@');
-  if (!domain) return val.replace(/.(?=.{4})/g, '*');
-  return `${name.substring(0, 2)}${'*'.repeat(Math.max(1, name.length - 2))}@${domain}`;
+  const s = String(val).trim();
+  const [name, domain] = s.split('@');
+  if (!domain) return s.slice(0, 2) + '****' + s.slice(-2);
+  const visible = name.slice(0, Math.min(2, name.length));
+  return `${visible}****@${domain}`;
+};
+
+const maskAddress = (val?: string) => {
+  if (!val) return '—';
+  const s = String(val).trim();
+  if (s.length <= 8) return s;
+  const parts = s.split(',').map(p => p.trim());
+  if (parts.length >= 2) {
+    return `${parts[0]}, ********, ${parts[parts.length - 1]}`;
+  }
+  const half = Math.floor(s.length / 2);
+  return `${s.slice(0, Math.min(half, 15))} ******** ${s.slice(-6)}`;
+};
+
+const maskSalary = (val?: string | number) => {
+  if (!val && val !== 0) return '—';
+  const num = Math.round(Number(val)) || 0;
+  const numStr = String(num);
+  if (numStr.length <= 3) return 'Rs. ***';
+  const firstDigit = numStr[0];
+  return `Rs. ${firstDigit}*,*** (Protected)`;
 };
 
 const getSummaryFields = (result: any) => {
@@ -101,7 +143,7 @@ const getSummaryFields = (result: any) => {
       return [
         { icon: <User className="w-4 h-4" />, label: "Employee", value: d.staff },
         { icon: <Hash className="w-4 h-4" />, label: "Employee ID", value: d.employee_id },
-        { icon: <Banknote className="w-4 h-4" />, label: "Net Salary", value: maskAmount(d.amount) },
+        { icon: <Banknote className="w-4 h-4" />, label: "Net Salary", value: maskSalary(d.amount) },
         { icon: <Tag className="w-4 h-4" />, label: "Status", value: d.status, isStatus: true },
       ];
     case "service_request":
@@ -132,6 +174,7 @@ const getDetailFields = (result: any) => {
         { label: "Location / City", value: d.city || "—" },
         ...(d.email ? [{ label: "Client Email", value: maskEmail(d.email) }] : []),
         ...(d.phone ? [{ label: "Client Phone", value: maskPhone(d.phone) }] : []),
+        ...(d.address ? [{ label: "Client Address", value: maskAddress(d.address) }] : []),
         { label: "Organization", value: "Electric Complaint Solutions (ECS)" },
         { label: "Authenticated By", value: authLabel },
       ];
@@ -145,6 +188,7 @@ const getDetailFields = (result: any) => {
         { label: "Location / City", value: d.city || "—" },
         ...(d.email ? [{ label: "Complainant Email", value: maskEmail(d.email) }] : []),
         ...(d.phone ? [{ label: "Complainant Phone", value: maskPhone(d.phone) }] : []),
+        ...(d.address ? [{ label: "Complainant Address", value: maskAddress(d.address) }] : []),
         { label: "Case Description", value: d.description || "—" },
         { label: "Organization", value: "Electric Complaint Solutions (ECS)" },
       ];
@@ -159,6 +203,7 @@ const getDetailFields = (result: any) => {
         { label: "CNIC", value: maskCNIC(d.cnic) },
         { label: "Contact Number", value: maskPhone(d.phone) },
         ...(d.email ? [{ label: "Email Address", value: maskEmail(d.email) }] : []),
+        ...(d.address ? [{ label: "Address", value: maskAddress(d.address) }] : []),
         { label: "Organization", value: "Electric Complaint Solutions (ECS)" },
         { label: "Authenticated By", value: authLabel },
       ];
@@ -170,7 +215,7 @@ const getDetailFields = (result: any) => {
         { label: "Primary City", value: d.city },
         { label: "Contact Phone", value: maskPhone(d.phone) },
         ...(d.email ? [{ label: "Branch Email", value: maskEmail(d.email) }] : []),
-        { label: "Official Address", value: d.address },
+        { label: "Official Address", value: maskAddress(d.address) },
         { label: "Organization", value: "Electric Complaint Solutions (ECS)" },
         { label: "Authenticated By", value: authLabel },
       ];
@@ -181,7 +226,9 @@ const getDetailFields = (result: any) => {
         { label: "Employee ID", value: d.employee_id },
         { label: "Designation", value: d.designation },
         { label: "Period", value: `${d.month} ${d.year}` },
-        { label: "Net Salary", value: maskAmount(d.amount) },
+        { label: "Net Salary", value: maskSalary(d.amount) },
+        ...(d.cnic ? [{ label: "CNIC", value: maskCNIC(d.cnic) }] : []),
+        ...(d.phone ? [{ label: "Contact Phone", value: maskPhone(d.phone) }] : []),
         { label: "Payment Status", value: d.status, isStatus: true },
         { label: "Paid On", value: d.paid_at ? fmt(d.paid_at) : "—" },
         { label: "Assigned Branch", value: d.branch },
@@ -200,6 +247,7 @@ const getDetailFields = (result: any) => {
         { label: "Assigned Branch", value: d.branch },
         ...(d.phone ? [{ label: "Customer Phone", value: maskPhone(d.phone) }] : []),
         ...(d.email ? [{ label: "Customer Email", value: maskEmail(d.email) }] : []),
+        ...(d.address ? [{ label: "Customer Address", value: maskAddress(d.address) }] : []),
         { label: "Organization", value: "Electric Complaint Solutions (ECS)" },
         { label: "Authenticated By", value: authLabel },
       ];
