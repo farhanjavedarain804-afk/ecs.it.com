@@ -2,6 +2,154 @@ import { jsPDF } from "jspdf";
 import QRCode from "qrcode";
 import { loadLogoForPDF } from "./logoLoader";
 
+/**
+ * Loads and auto-adjusts employee photo using an offscreen canvas
+ * with proportional cover cropping (object-fit: cover) and subtle
+ * face-bias so employee photos never appear squashed or distorted.
+ */
+const loadAndAdjustEmployeePhoto = (photoUrl: string, targetW: number = 400, targetH: number = 450): Promise<string | null> => {
+    return new Promise((resolve) => {
+        if (!photoUrl || typeof photoUrl !== 'string') {
+            resolve(null);
+            return;
+        }
+
+        let fullUrl = photoUrl;
+        if (!fullUrl.startsWith('data:') && !fullUrl.startsWith('http://') && !fullUrl.startsWith('https://')) {
+            const apiBase = (import.meta.env.VITE_API_URL ?? '').replace(/\/$/, '');
+            if (fullUrl.startsWith('/')) {
+                fullUrl = `${apiBase}${fullUrl}`;
+            } else {
+                fullUrl = `${apiBase}/uploads/${fullUrl}`;
+            }
+        }
+
+        const img = new Image();
+        img.crossOrigin = 'anonymous';
+
+        img.onload = () => {
+            try {
+                const canvas = document.createElement('canvas');
+                canvas.width = targetW;
+                canvas.height = targetH;
+                const ctx = canvas.getContext('2d');
+                if (!ctx) { resolve(null); return; }
+
+                ctx.fillStyle = '#ffffff';
+                ctx.fillRect(0, 0, targetW, targetH);
+
+                const srcW = img.naturalWidth || img.width;
+                const srcH = img.naturalHeight || img.height;
+                const srcRatio = srcW / srcH;
+                const targetRatio = targetW / targetH;
+
+                let sWidth = srcW;
+                let sHeight = srcH;
+                let sx = 0;
+                let sy = 0;
+
+                if (srcRatio > targetRatio) {
+                    // Image wider than target frame: crop horizontal sides
+                    sWidth = srcH * targetRatio;
+                    sx = (srcW - sWidth) / 2;
+                } else {
+                    // Image taller than target frame: crop vertical with upper-center focus for faces
+                    sHeight = srcW / targetRatio;
+                    sy = (srcH - sHeight) * 0.2; // 20% down from top
+                }
+
+                ctx.drawImage(img, sx, sy, sWidth, sHeight, 0, 0, targetW, targetH);
+                resolve(canvas.toDataURL('image/jpeg', 0.95));
+            } catch (err) {
+                console.warn("Canvas crop failed, fallback to direct image", err);
+                resolve(null);
+            }
+        };
+
+        img.onerror = () => {
+            // Secondary fallback attempt: fetch blob
+            fetch(fullUrl)
+                .then(res => res.blob())
+                .then(blob => {
+                    const reader = new FileReader();
+                    reader.onloadend = () => {
+                        const rawData = reader.result as string;
+                        const fallbackImg = new Image();
+                        fallbackImg.onload = () => {
+                            try {
+                                const canvas = document.createElement('canvas');
+                                canvas.width = targetW;
+                                canvas.height = targetH;
+                                const ctx = canvas.getContext('2d');
+                                if (ctx) {
+                                    ctx.fillStyle = '#ffffff';
+                                    ctx.fillRect(0, 0, targetW, targetH);
+                                    ctx.drawImage(fallbackImg, 0, 0, targetW, targetH);
+                                    resolve(canvas.toDataURL('image/jpeg', 0.95));
+                                    return;
+                                }
+                            } catch {}
+                            resolve(rawData);
+                        };
+                        fallbackImg.onerror = () => resolve(rawData);
+                        fallbackImg.src = rawData;
+                    };
+                    reader.onerror = () => resolve(null);
+                    reader.readAsDataURL(blob);
+                })
+                .catch(() => resolve(null));
+        };
+
+        img.src = fullUrl;
+    });
+};
+
+/**
+ * Draws a sharp, clear, high-density Code39 barcode vector in jsPDF
+ */
+const drawCode39Barcode = (doc: jsPDF, text: string, x: number, y: number, maxWidth: number, height: number) => {
+    const CODE39: Record<string, string> = {
+        '0': 'bwbwbwBwb', '1': 'BwbwbwbwB', '2': 'bwBwbwbwB', '3': 'BwBwbwbwb',
+        '4': 'bwbwBwbwB', '5': 'BwbwBwbwb', '6': 'bwBwBwbwb', '7': 'bwbwbwBwB',
+        '8': 'BwbwbwBwb', '9': 'bwBwbwBwb', 'A': 'BwbwbwbwB', 'B': 'bwBwbwbwB',
+        'C': 'BwBwbwbwb', 'D': 'bwbwBwbwB', 'E': 'BwbwBwbwb', 'F': 'bwBwBwbwb',
+        'G': 'bwbwbwBwB', 'H': 'BwbwbwBwb', 'I': 'bwBwbwBwb', 'J': 'bwbwBwBwb',
+        'K': 'BwbwbwbwB', 'L': 'bwBwbwbwB', 'M': 'BwBwbwbwb', 'N': 'bwbwBwbwB',
+        'O': 'BwbwBwbwb', 'P': 'bwBwBwbwb', 'Q': 'bwbwbwBwB', 'R': 'BwbwbwBwb',
+        'S': 'bwBwbwBwb', 'T': 'bwbwBwBwb', 'U': 'BwbwbwbwB', 'V': 'bwBwbwbwB',
+        'W': 'BwBwbwbwb', 'X': 'bwbwBwbwB', 'Y': 'BwbwBwbwb', 'Z': 'bwBwBwbwb',
+        '-': 'bWbwbwbwB', '.': 'Bwbwbwbwb', ' ': 'bwBwbwbwb', '*': 'bWbwBwBwb'
+    };
+
+    const clean = '*' + String(text || '').toUpperCase().replace(/[^0-9A-Z\-\.\s]/g, '') + '*';
+    let pattern = '';
+    for (const ch of clean) {
+        pattern += (CODE39[ch] || CODE39['-']) + 'w';
+    }
+
+    let totalUnits = 0;
+    for (const char of pattern) {
+        totalUnits += (char === 'B' || char === 'W') ? 2.5 : 1;
+    }
+    const unitWidth = maxWidth / totalUnits;
+
+    // Draw crisp white background behind barcode for maximum contrast
+    doc.setFillColor(255, 255, 255);
+    doc.rect(x - 0.5, y - 0.5, maxWidth + 1, height + 1, 'F');
+
+    let currentX = x;
+    doc.setFillColor(15, 23, 42); // Deep rich black
+    for (const char of pattern) {
+        const isBar = (char === 'b' || char === 'B');
+        const isWide = (char === 'B' || char === 'W');
+        const w = isWide ? unitWidth * 2.5 : unitWidth;
+        if (isBar) {
+            doc.rect(currentX, y, w, height, 'F');
+        }
+        currentX += w;
+    }
+};
+
 export const generateEmployeeCard = async (data: any) => {
     // Standard CR80 ID Card dimensions: 54mm x 86mm (Portrait)
     const cardWidth = 54;
@@ -36,7 +184,6 @@ export const generateEmployeeCard = async (data: any) => {
     const qrData = `${window.location.origin}/verify?id=${empCode}`;
     const logoBase64 = await loadLogoForPDF('/LOGO.png');
     const designation = String(data.designation || 'Staff Member');
-    const branchName = data.branch_name || data.branches?.name || 'Islamabad';
 
     // Helper: draw subtle faint grid pattern like template
     const drawGridPattern = () => {
@@ -57,54 +204,51 @@ export const generateEmployeeCard = async (data: any) => {
     doc.rect(0, 0, cardWidth, cardHeight, 'F');
     drawGridPattern();
 
-    // Bold Red Right Vertical Stripe (Matches Template exactly)
-    const stripeWidth = 12.5;
+    // Bold Red Right Vertical Stripe (Matches Template)
+    const stripeWidth = 11.5;
     const stripeX = cardWidth - stripeWidth;
+    const stripeCenterX = stripeX + (stripeWidth / 2);
     doc.setFillColor(220, 38, 38); // Crimson Brand Red
     doc.rect(stripeX, 0, stripeWidth, cardHeight, 'F');
 
-    // Right Edge Vertical Designation Text
+    // Right Edge Vertical Title on Red Stripe: "ELECTRIC COMPLAINT SOLUTIONS - ECS"
     doc.setFont("helvetica", "bold");
-    doc.setFontSize(8.5);
+    doc.setFontSize(5.8);
     doc.setTextColor(255, 255, 255);
-    // Truncate designation if very long
-    const cleanDesig = designation.length > 20 ? designation.slice(0, 18) + '...' : designation;
-    doc.text(cleanDesig.toUpperCase(), stripeX + 7, 10, { angle: 90 });
+    const stripTitle = "ELECTRIC COMPLAINT SOLUTIONS - ECS";
+    const stripTextW = doc.getTextWidth(stripTitle);
+    const startY = (cardHeight - stripTextW) / 2;
+    doc.text(stripTitle, stripeCenterX + 0.8, startY, { angle: 90 });
 
-    // Top-Left: Logo & Company Name
+    // Top-Left: Original Logo in exact aspect ratio (Clean alignment above photo frame)
+    const photoX = 5.5;
+    const photoY = 13;
+    const photoW = 31.5;
+    const photoH = 35;
+
     if (logoBase64) {
         try {
-            doc.addImage(logoBase64, 'PNG', 4.5, 4.5, 9, 8);
+            // Original aspect ratio 2.1 : 1
+            const logoW = 19;
+            const logoH = 9;
+            doc.addImage(logoBase64, 'PNG', photoX, 2.5, logoW, logoH);
         } catch {
             // fallback
         }
     }
-    doc.setFontSize(6.5);
-    doc.setFont("helvetica", "bold");
-    doc.setTextColor(220, 38, 38);
-    doc.text("ECS PAKISTAN", 15, 8);
-    doc.setFontSize(4.5);
-    doc.setFont("helvetica", "normal");
-    doc.setTextColor(100);
-    doc.text("Complaint Solutions", 15, 11);
 
     // Profile Photo Box with Red Border Frame
-    const photoX = 5.5;
-    const photoY = 15;
-    const photoW = 30;
-    const photoH = 36;
-
     doc.setDrawColor(220, 38, 38);
     doc.setLineWidth(0.6);
     doc.rect(photoX, photoY, photoW, photoH, 'S');
 
-    // If staff has a photo uploaded, display it
+    // Auto-adjust uploaded profile photo with aspect-fit cover
     let photoLoaded = false;
-    if (data.profile_photo && typeof data.profile_photo === 'string' && data.profile_photo.startsWith('http')) {
+    if (data.profile_photo && typeof data.profile_photo === 'string') {
         try {
-            const photoImg = await loadLogoForPDF(data.profile_photo);
-            if (photoImg) {
-                doc.addImage(photoImg, 'JPEG', photoX + 0.4, photoY + 0.4, photoW - 0.8, photoH - 0.8);
+            const adjustedPhoto = await loadAndAdjustEmployeePhoto(data.profile_photo, 400, 445);
+            if (adjustedPhoto) {
+                doc.addImage(adjustedPhoto, 'JPEG', photoX + 0.4, photoY + 0.4, photoW - 0.8, photoH - 0.8);
                 photoLoaded = true;
             }
         } catch (photoErr) {
@@ -113,15 +257,15 @@ export const generateEmployeeCard = async (data: any) => {
     }
 
     if (!photoLoaded) {
-        // Draw crisp modern silhouette placeholder
+        // Crisp modern silhouette placeholder
         doc.setFillColor(241, 245, 249);
         doc.rect(photoX + 0.4, photoY + 0.4, photoW - 0.8, photoH - 0.8, 'F');
         
         // Silhouette head
         doc.setFillColor(203, 213, 225);
-        doc.circle(photoX + (photoW / 2), photoY + 14, 6.5, 'F');
+        doc.circle(photoX + (photoW / 2), photoY + 13.5, 6.5, 'F');
         // Silhouette shoulders
-        doc.roundedRect(photoX + 5, photoY + 23, photoW - 10, 12, 5, 5, 'F');
+        doc.roundedRect(photoX + 5, photoY + 22.5, photoW - 10, 12, 5, 5, 'F');
         
         doc.setFontSize(4);
         doc.setFont("helvetica", "bold");
@@ -129,18 +273,32 @@ export const generateEmployeeCard = async (data: any) => {
         doc.text("PHOTO", photoX + (photoW / 2), photoY + photoH - 2, { align: "center" });
     }
 
-    // Employee Full Name
-    let currentY = 55;
+    // Employee Full Name (Bold)
+    let currentY = photoY + photoH + 4;
     doc.setFontSize(8.5);
     doc.setFont("helvetica", "bold");
-    doc.setTextColor(185, 28, 28); // Dark Red
-    const nameLines = doc.splitTextToSize(String(data.full_name || 'Employee Name'), 33);
-    doc.text(nameLines[0] || 'Employee Name', 5.5, currentY);
+    doc.setTextColor(220, 38, 38); // Bold Brand Red
+    const nameLines = doc.splitTextToSize(String(data.full_name || 'Employee Name'), photoW);
+    doc.text(nameLines[0] || 'Employee Name', photoX, currentY);
     if (nameLines[1]) {
         currentY += 3.5;
-        doc.text(nameLines[1], 5.5, currentY);
+        doc.text(nameLines[1], photoX, currentY);
     }
-    currentY += 4.5;
+
+    // Designation (Semi-bold, under the Name)
+    currentY += 3.8;
+    doc.setFontSize(6.0);
+    doc.setFont("helvetica", "bold");
+    doc.setTextColor(71, 85, 105); // Slate semi-bold feel
+    const cleanDesig = designation.length > 26 ? designation.slice(0, 24) + '...' : designation;
+    const desigLines = doc.splitTextToSize(cleanDesig.toUpperCase(), photoW);
+    doc.text(desigLines[0] || 'STAFF MEMBER', photoX, currentY);
+    if (desigLines[1]) {
+        currentY += 3;
+        doc.text(desigLines[1], photoX, currentY);
+    }
+
+    currentY += 4.2;
 
     // Metadata Fields
     const cardFields = [
@@ -154,34 +312,24 @@ export const generateEmployeeCard = async (data: any) => {
         doc.setFontSize(5);
         doc.setFont("helvetica", "bold");
         doc.setTextColor(30);
-        doc.text(`${f.label}`, 5.5, currentY);
-        doc.text(`:`, 13, currentY);
+        doc.text(`${f.label}`, photoX, currentY);
+        doc.text(`:`, photoX + 8, currentY);
         doc.setFont("helvetica", "normal");
         doc.setTextColor(60);
-        const valTrunc = doc.splitTextToSize(String(f.value), 26)[0] || '';
-        doc.text(valTrunc, 15, currentY);
-        currentY += 3;
+        const valTrunc = doc.splitTextToSize(String(f.value), 22)[0] || '';
+        doc.text(valTrunc, photoX + 10, currentY);
+        currentY += 2.8;
     });
 
-    // Barcode Pattern at Bottom
-    const bcX = 5.5;
-    const bcY = 74;
-    const bcW = 32;
-    const bcH = 6.5;
-    const barPattern = [1, 2, 1, 1, 3, 1, 2, 1, 3, 1, 1, 2, 1, 3, 2, 1, 1, 2, 3, 1, 2, 1, 1, 3, 1, 2, 1, 2, 1, 3, 1];
-    let currX = bcX;
-    doc.setFillColor(30, 30, 30);
-    for (let b = 0; b < barPattern.length && currX < bcX + bcW; b++) {
-        const w = barPattern[b] * 0.3;
-        if (b % 2 === 0) {
-            doc.rect(currX, bcY, w, bcH, 'F');
-        }
-        currX += w + 0.35;
-    }
-    doc.setFontSize(4.5);
-    doc.setFont("helvetica", "normal");
-    doc.setTextColor(80);
-    doc.text(String(empCode), bcX + (bcW / 2), bcY + bcH + 2.5, { align: "center" });
+    // High-Resolution Prominent Barcode
+    const bcY = currentY + 1.2;
+    const bcH = 5.5;
+    drawCode39Barcode(doc, empCode, photoX, bcY, photoW, bcH);
+
+    doc.setFontSize(4.8);
+    doc.setFont("helvetica", "bold");
+    doc.setTextColor(50);
+    doc.text(String(empCode), photoX + (photoW / 2), bcY + bcH + 2.3, { align: "center" });
 
     // Little red accent square at bottom-left corner (Matches template)
     doc.setFillColor(220, 38, 38);
@@ -196,7 +344,7 @@ export const generateEmployeeCard = async (data: any) => {
     doc.rect(0, 0, cardWidth, cardHeight, 'F');
     drawGridPattern();
 
-    // Red Stripe on the Left (Matches Back-side Template exactly)
+    // Red Stripe on the Left (Matches Back-side Template)
     const backStripeW = 7;
     doc.setFillColor(220, 38, 38);
     doc.rect(0, 0, backStripeW, cardHeight, 'F');
@@ -205,26 +353,20 @@ export const generateEmployeeCard = async (data: any) => {
     doc.rect(cardWidth - 6, 0, 6, 3, 'F');
     doc.rect(cardWidth - 3, 3, 3, 3, 'F');
 
-    // Top-Center: Logo & Company Name
+    // Top-Center: Logo in Original Proportion
     const backCenterX = (cardWidth + backStripeW) / 2; // ~30.5mm
     if (logoBase64) {
         try {
-            doc.addImage(logoBase64, 'PNG', backCenterX - 14, 4.5, 7, 6);
+            const backLogoW = 15;
+            const backLogoH = 7.1;
+            doc.addImage(logoBase64, 'PNG', backCenterX - (backLogoW / 2), 4, backLogoW, backLogoH);
         } catch {
             // fallback
         }
     }
-    doc.setFontSize(6.5);
-    doc.setFont("helvetica", "bold");
-    doc.setTextColor(220, 38, 38);
-    doc.text("ECS PAKISTAN", backCenterX - 5, 7.5);
-    doc.setFontSize(4);
-    doc.setFont("helvetica", "normal");
-    doc.setTextColor(100);
-    doc.text("Electric Complaint Solutions", backCenterX - 5, 10);
 
     // Title: TERMS & CONDITIONS
-    let backY = 16.5;
+    let backY = 15;
     doc.setFontSize(6.5);
     doc.setFont("helvetica", "bold");
     doc.setTextColor(20, 30, 60);
@@ -235,7 +377,7 @@ export const generateEmployeeCard = async (data: any) => {
     doc.line(backStripeW + 3, backY + 1.5, cardWidth - 3, backY + 1.5);
     backY += 4.5;
 
-    // Terms Text (Exact words from template adapted for ECS)
+    // Terms Text (Official company badge rules)
     const termsList = [
         {
             title: "Identification:",
