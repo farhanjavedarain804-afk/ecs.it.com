@@ -11,6 +11,8 @@ import { generatePDF, exportTableToPDF } from "@/utils/pdfGenerator";
 import { logActivity } from "@/utils/logger";
 import { generateAppointmentLetter } from "@/utils/appointmentLetterGenerator";
 import { generateExperienceLetter } from "@/utils/experienceLetterGenerator";
+import { generateTerminationLetter } from "@/utils/terminationLetterGenerator";
+import { generateEmployeeCard } from "@/utils/employeeCardGenerator";
 
 const API_URL = import.meta.env.VITE_API_URL ?? '';
 
@@ -26,6 +28,15 @@ const Staff = () => {
   const [viewingStaff, setViewingStaff] = useState<any | null>(null);
   const [activeFormTab, setActiveFormTab] = useState<"personal" | "job" | "payroll" | "emergency" | "documents">("personal");
   const [uploadingDoc, setUploadingDoc] = useState<string | null>(null);
+  const [terminationModalStaff, setTerminationModalStaff] = useState<any | null>(null);
+  const [terminationForm, setTerminationForm] = useState({
+    reason: "",
+    date: new Date().toISOString().split("T")[0],
+    time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false }),
+    terminatedBy: "",
+    notes: ""
+  });
+  const [terminating, setTerminating] = useState(false);
   const { toast } = useToast();
 
   const isEditable = (createdAt: string) => {
@@ -112,6 +123,127 @@ const Staff = () => {
   useEffect(() => {
     if (profile) fetchAll();
   }, [profile]);
+
+  const handleStatusChange = async (staffMember: any, newStatus: string) => {
+    if (newStatus === "terminated") {
+      const defaultAuthorizer = profile?.full_name || user?.email || "HR Authority";
+      setTerminationForm({
+        reason: staffMember.termination_reason || "",
+        date: new Date().toISOString().split("T")[0],
+        time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false }),
+        terminatedBy: staffMember.terminated_by || defaultAuthorizer,
+        notes: ""
+      });
+      setTerminationModalStaff(staffMember);
+    } else {
+      try {
+        const token = localStorage.getItem("ecs_token");
+        const res = await fetch(`${API_URL}/api/staff/${staffMember.id}`, {
+          method: 'PATCH',
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({ status: newStatus })
+        });
+        if (!res.ok) {
+          const err = await res.json();
+          throw new Error(err.error || "Failed to update status");
+        }
+        await logActivity({
+          userId: user?.id!,
+          userEmail: user?.email!,
+          activityType: "STAFF_STATUS_UPDATED",
+          branchId: staffMember.branch_id || profile?.branch_id || null,
+          metadata: { staffId: staffMember.id, oldStatus: staffMember.status, newStatus }
+        });
+        toast({ title: "Status Updated", description: `Staff status changed to ${newStatus.toUpperCase()}` });
+        fetchAll();
+      } catch (err: any) {
+        toast({ title: "Update Failed", description: err.message, variant: "destructive" });
+      }
+    }
+  };
+
+  const handleConfirmTermination = async () => {
+    if (!terminationModalStaff) return;
+    if (!terminationForm.reason.trim()) {
+      toast({ title: "Reason Required", description: "Baraye meharbani termination ki wajah darj karein.", variant: "destructive" });
+      return;
+    }
+    if (!terminationForm.terminatedBy.trim()) {
+      toast({ title: "Authorizer Name Required", description: "Terminated by / Authorizer ka naam darj karein.", variant: "destructive" });
+      return;
+    }
+
+    try {
+      setTerminating(true);
+      const token = localStorage.getItem("ecs_token");
+      const fullTerminatedAt = `${terminationForm.date} ${terminationForm.time}`;
+
+      const res = await fetch(`${API_URL}/api/staff/${terminationModalStaff.id}`, {
+        method: 'PATCH',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          status: 'terminated',
+          termination_reason: terminationForm.reason,
+          terminated_at: fullTerminatedAt,
+          terminated_by: terminationForm.terminatedBy,
+          notes: terminationForm.notes ? (terminationModalStaff.notes ? `${terminationModalStaff.notes} | ${terminationForm.notes}` : terminationForm.notes) : terminationModalStaff.notes
+        })
+      });
+
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.error || "Failed to terminate staff");
+      }
+
+      await logActivity({
+        userId: user?.id!,
+        userEmail: user?.email!,
+        activityType: "STAFF_TERMINATED",
+        branchId: terminationModalStaff.branch_id || profile?.branch_id || null,
+        metadata: {
+          staffId: terminationModalStaff.id,
+          reason: terminationForm.reason,
+          terminatedBy: terminationForm.terminatedBy,
+          terminatedAt: fullTerminatedAt
+        }
+      });
+
+      toast({
+        title: "Staff Terminated",
+        description: `${terminationModalStaff.full_name} has been marked as terminated.`
+      });
+
+      // Automatically generate and download Termination Letter PDF
+      try {
+        await generateTerminationLetter({
+          ...terminationModalStaff,
+          status: 'terminated',
+          termination_reason: terminationForm.reason,
+          terminated_at: fullTerminatedAt,
+          terminated_by: terminationForm.terminatedBy
+        });
+        toast({
+          title: "Termination Letter Ready",
+          description: "Formal termination letter PDF downloaded."
+        });
+      } catch (pdfErr) {
+        console.error("Termination letter generation error:", pdfErr);
+      }
+
+      setTerminationModalStaff(null);
+      fetchAll();
+    } catch (err: any) {
+      toast({ title: "Termination Failed", description: err.message, variant: "destructive" });
+    } finally {
+      setTerminating(false);
+    }
+  };
 
   const handleDocumentUpload = async (field: 'profile_photo' | 'doc_cnic' | 'doc_resume' | 'doc_appointment', file: File) => {
     if (!file) return;
@@ -998,6 +1130,158 @@ const Staff = () => {
         </div>
       )}
 
+      {/* Termination Notice & Reason Modal Popup */}
+      {terminationModalStaff && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4 overflow-y-auto animate-in fade-in duration-200">
+          <div className="w-full max-w-lg rounded-3xl bg-card border border-rose-200 dark:border-rose-900/60 p-6 sm:p-8 shadow-2xl animate-in zoom-in-95 duration-200 space-y-5">
+            <div className="flex items-start justify-between pb-4 border-b border-border">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-2xl bg-rose-100 dark:bg-rose-950/60 text-rose-600 dark:text-rose-400 flex items-center justify-center font-bold text-lg shadow-xs">
+                  <ShieldAlert className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-lg font-black text-foreground">Terminate Employee (ملازمت کا خاتمہ)</h3>
+                  <p className="text-xs text-muted-foreground">
+                    Staff: <span className="font-bold text-foreground">{terminationModalStaff.full_name}</span> • <span className="font-mono text-primary">{terminationModalStaff.employee_id}</span>
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={() => setTerminationModalStaff(null)}
+                className="p-2 rounded-full hover:bg-muted text-muted-foreground transition-colors"
+              >
+                <XCircle className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="space-y-4">
+              {/* Employee Summary Card */}
+              <div className="p-3.5 rounded-2xl bg-rose-50/70 dark:bg-rose-950/30 border border-rose-200 dark:border-rose-900/40 text-xs flex items-center justify-between">
+                <div>
+                  <span className="text-[10px] uppercase font-bold text-rose-800 dark:text-rose-300 tracking-wider">Designation / Role</span>
+                  <p className="font-bold text-foreground text-sm">{terminationModalStaff.designation || 'Staff Member'}</p>
+                </div>
+                <div className="text-right">
+                  <span className="text-[10px] uppercase font-bold text-muted-foreground tracking-wider">Branch</span>
+                  <p className="font-bold text-foreground">{terminationModalStaff.branch_name || 'Main Office'}</p>
+                </div>
+              </div>
+
+              {/* Reason for Termination */}
+              <div>
+                <label className="block text-xs font-bold text-foreground mb-1.5">
+                  Reason for Termination (وجہ) <span className="text-destructive">*</span>
+                </label>
+                <select
+                  onChange={(e) => {
+                    if (e.target.value !== "Custom Reason") {
+                      setTerminationForm({ ...terminationForm, reason: e.target.value });
+                    }
+                  }}
+                  className="w-full px-3 py-2 mb-2 rounded-xl border border-input bg-background text-foreground text-xs font-medium focus:ring-2 focus:ring-rose-500/30 outline-none"
+                >
+                  <option value="">-- Select Common Reason --</option>
+                  <option value="Misconduct & Disciplinary Violation">Misconduct & Disciplinary Violation</option>
+                  <option value="Repeated Absence Without Leave (AWOL)">Repeated Absence Without Leave (AWOL)</option>
+                  <option value="Unsatisfactory Job Performance">Unsatisfactory Job Performance</option>
+                  <option value="Breach of Company Policy & Trust">Breach of Company Policy & Trust</option>
+                  <option value="Contract Expiry / Non-Renewal">Contract Expiry / Non-Renewal</option>
+                  <option value="Mutual Separation Agreement">Mutual Separation Agreement</option>
+                  <option value="Custom Reason">Custom Reason (Type below)</option>
+                </select>
+                <textarea
+                  rows={3}
+                  value={terminationForm.reason}
+                  onChange={(e) => setTerminationForm({ ...terminationForm, reason: e.target.value })}
+                  placeholder="Mukammal tafseel darj karein ke employee ko kis wajah se terminate kia ja raha hai..."
+                  className="w-full px-3.5 py-2.5 rounded-xl border border-input bg-background text-foreground text-xs focus:ring-2 focus:ring-rose-500/30 focus:border-rose-500 outline-none transition-all"
+                  required
+                />
+              </div>
+
+              {/* Date & Time Section */}
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-bold text-foreground mb-1">
+                    Termination Date <span className="text-destructive">*</span>
+                  </label>
+                  <input
+                    type="date"
+                    value={terminationForm.date}
+                    onChange={(e) => setTerminationForm({ ...terminationForm, date: e.target.value })}
+                    className="w-full px-3 py-2 rounded-xl border border-input bg-background text-foreground text-xs font-medium focus:ring-2 focus:ring-rose-500/30 outline-none"
+                    required
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-foreground mb-1">
+                    Effective Time <span className="text-destructive">*</span>
+                  </label>
+                  <input
+                    type="time"
+                    value={terminationForm.time}
+                    onChange={(e) => setTerminationForm({ ...terminationForm, time: e.target.value })}
+                    className="w-full px-3 py-2 rounded-xl border border-input bg-background text-foreground text-xs font-medium focus:ring-2 focus:ring-rose-500/30 outline-none"
+                    required
+                  />
+                </div>
+              </div>
+
+              {/* Terminated By Name */}
+              <div>
+                <label className="block text-xs font-bold text-foreground mb-1.5">
+                  Terminated By / Authorizer Name <span className="text-destructive">*</span>
+                </label>
+                <input
+                  type="text"
+                  value={terminationForm.terminatedBy}
+                  onChange={(e) => setTerminationForm({ ...terminationForm, terminatedBy: e.target.value })}
+                  placeholder="e.g. Muhammad Aamir (CEO) or Branch Manager"
+                  className="w-full px-3.5 py-2 rounded-xl border border-input bg-background text-foreground text-xs font-bold focus:ring-2 focus:ring-rose-500/30 outline-none"
+                  required
+                />
+                <p className="text-[11px] text-muted-foreground mt-1">
+                  Yeh naam official termination letter par ba-hesiyat authorized authority print hoga.
+                </p>
+              </div>
+
+              {/* Additional Remarks */}
+              <div>
+                <label className="block text-xs font-bold text-foreground mb-1">
+                  Internal Remarks / Notes (Optional)
+                </label>
+                <input
+                  type="text"
+                  value={terminationForm.notes}
+                  onChange={(e) => setTerminationForm({ ...terminationForm, notes: e.target.value })}
+                  placeholder="e.g. All tools, keys and ID card collected."
+                  className="w-full px-3 py-2 rounded-xl border border-input bg-background text-foreground text-xs focus:ring-2 focus:ring-rose-500/30 outline-none"
+                />
+              </div>
+            </div>
+
+            <div className="flex items-center justify-end gap-3 pt-4 border-t border-border">
+              <button
+                type="button"
+                onClick={() => setTerminationModalStaff(null)}
+                className="px-4 py-2.5 rounded-xl border border-input hover:bg-muted text-foreground text-xs font-bold transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                disabled={terminating}
+                onClick={handleConfirmTermination}
+                className="px-5 py-2.5 rounded-xl bg-destructive hover:bg-destructive/90 active:scale-95 text-destructive-foreground text-xs font-bold transition-all shadow-md flex items-center gap-2 disabled:opacity-50"
+              >
+                <FileDown className="w-4 h-4" />
+                {terminating ? "Processing & Generating..." : "Confirm Termination & Generate Letter"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* View Full Employee Profile Modal */}
       {viewingStaff && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4 animate-in fade-in duration-200">
@@ -1023,11 +1307,27 @@ const Staff = () => {
               <div className="flex items-center gap-2">
                 <button
                   onClick={() => generatePDF('employee_record', viewingStaff)}
-                  className="px-3.5 py-2 rounded-xl bg-primary text-primary-foreground text-xs font-bold flex items-center gap-1.5 shadow-sm hover:bg-primary/90 active:scale-95 transition-all"
+                  className="px-3 py-2 rounded-xl bg-primary text-primary-foreground text-xs font-bold flex items-center gap-1.5 shadow-sm hover:bg-primary/90 active:scale-95 transition-all"
                   title="Download Official Employee Service Record PDF"
                 >
-                  <Printer className="w-3.5 h-3.5" /> Download Profile PDF
+                  <Printer className="w-3.5 h-3.5" /> Service Record
                 </button>
+                <button
+                  onClick={() => generateEmployeeCard(viewingStaff)}
+                  className="px-3 py-2 rounded-xl bg-rose-600 text-white text-xs font-bold flex items-center gap-1.5 shadow-sm hover:bg-rose-700 active:scale-95 transition-all"
+                  title="Download HD Employee ID Card (Front & Back)"
+                >
+                  <CreditCard className="w-3.5 h-3.5" /> ID Card
+                </button>
+                {viewingStaff.status === 'terminated' && (
+                  <button
+                    onClick={() => generateTerminationLetter(viewingStaff)}
+                    className="px-3 py-2 rounded-xl bg-destructive text-destructive-foreground text-xs font-bold flex items-center gap-1.5 shadow-sm hover:bg-destructive/90 active:scale-95 transition-all"
+                    title="Download Formal Termination Notice"
+                  >
+                    <FileDown className="w-3.5 h-3.5" /> Termination Letter
+                  </button>
+                )}
                 <button 
                   onClick={() => setViewingStaff(null)}
                   className="w-8 h-8 rounded-full hover:bg-muted text-muted-foreground flex items-center justify-center"
@@ -1041,7 +1341,19 @@ const Staff = () => {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
               {/* Personal Details */}
               <div className="p-4 rounded-2xl bg-muted/20 border border-border space-y-2">
-                <h4 className="font-bold text-primary uppercase tracking-wider text-[11px] mb-2">Personal Information</h4>
+                {viewingStaff.status === 'terminated' && (
+                <div className="md:col-span-2 p-4 rounded-2xl bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-900/50 space-y-2">
+                  <div className="flex items-center gap-2 text-rose-800 dark:text-rose-300 font-bold text-xs uppercase tracking-wider">
+                    <ShieldAlert className="w-4 h-4" /> Employment Terminated Record
+                  </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 pt-1 text-xs">
+                    <div><span className="text-muted-foreground block text-[10px]">Reason:</span><span className="font-semibold text-rose-700 dark:text-rose-300">{viewingStaff.termination_reason || 'Administrative action'}</span></div>
+                    <div><span className="text-muted-foreground block text-[10px]">Date & Time:</span><span className="font-semibold">{viewingStaff.terminated_at ? new Date(viewingStaff.terminated_at).toLocaleString() : '—'}</span></div>
+                    <div><span className="text-muted-foreground block text-[10px]">Terminated By:</span><span className="font-semibold">{viewingStaff.terminated_by || 'HR Authority'}</span></div>
+                  </div>
+                </div>
+              )}
+              <h4 className="font-bold text-primary uppercase tracking-wider text-[11px] mb-2">Personal Information</h4>
                 <div className="flex justify-between py-1 border-b border-border/50"><span className="text-muted-foreground">Father Name:</span><span className="font-semibold">{viewingStaff.father_name || '—'}</span></div>
                 <div className="flex justify-between py-1 border-b border-border/50"><span className="text-muted-foreground">CNIC:</span><span className="font-mono font-semibold">{viewingStaff.cnic || '—'}</span></div>
                 <div className="flex justify-between py-1 border-b border-border/50"><span className="text-muted-foreground">Date of Birth:</span><span className="font-semibold">{viewingStaff.dob ? new Date(viewingStaff.dob).toLocaleDateString() : '—'}</span></div>
@@ -1196,13 +1508,31 @@ const Staff = () => {
                     </div>
                   </td>
                   <td className="px-4 py-3">
-                    <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wide ${
-                      s.status === 'active' ? 'bg-emerald-500/10 text-emerald-600' :
-                      s.status === 'terminated' ? 'bg-destructive/10 text-destructive' :
-                      'bg-muted-foreground/10 text-muted-foreground'
-                    }`}>
-                      {s.status}
-                    </span>
+                    <div className="flex items-center gap-1.5">
+                      <select
+                        value={s.status || "active"}
+                        onChange={(e) => handleStatusChange(s, e.target.value)}
+                        className={`px-2.5 py-1.5 rounded-lg text-xs font-bold capitalize border-0 cursor-pointer shadow-xs transition-all hover:scale-105 ${
+                          s.status === 'active' ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300' :
+                          s.status === 'terminated' ? 'bg-rose-100 text-rose-800 dark:bg-rose-950 dark:text-rose-300' :
+                          'bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300'
+                        }`}
+                      >
+                        <option value="active" className="bg-background text-foreground font-semibold">Active</option>
+                        <option value="inactive" className="bg-background text-foreground font-semibold">Inactive</option>
+                        <option value="terminated" className="bg-background text-foreground font-semibold">Terminated</option>
+                      </select>
+                      {s.status === 'terminated' && (
+                        <button
+                          type="button"
+                          onClick={() => handleStatusChange(s, 'terminated')}
+                          className="p-1 rounded bg-rose-100 text-rose-700 hover:bg-rose-200 dark:bg-rose-900/50 dark:text-rose-300 transition-colors"
+                          title="Edit Termination Details & Reason"
+                        >
+                          <Edit2 className="w-3 h-3" />
+                        </button>
+                      )}
+                    </div>
                   </td>
                   <td className="px-4 py-3 text-right">
                     <div className="flex justify-end items-center gap-1">
@@ -1220,6 +1550,22 @@ const Staff = () => {
                       >
                         <Printer className="w-4 h-4" />
                       </button>
+                      <button 
+                        onClick={() => generateEmployeeCard(s)} 
+                        className="p-1.5 rounded-lg hover:bg-rose-100 text-rose-700 dark:hover:bg-rose-950 dark:text-rose-300 transition-colors shadow-xs" 
+                        title="Download Official Employee ID Card (HD PDF - Front & Back)"
+                      >
+                        <CreditCard className="w-4 h-4" />
+                      </button>
+                      {s.status === 'terminated' && (
+                        <button 
+                          onClick={() => generateTerminationLetter(s)} 
+                          className="p-1.5 rounded-lg hover:bg-rose-100 text-rose-800 dark:hover:bg-rose-950 dark:text-rose-300 transition-colors shadow-xs" 
+                          title="Download Termination Letter PDF"
+                        >
+                          <FileDown className="w-4 h-4" />
+                        </button>
+                      )}
                       {isAdminOrDev && (
                         <>
                           <button 

@@ -3,7 +3,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { useSearchParams, useNavigate, Link } from "react-router-dom";
 import {
   ShieldCheck, Search, ScanLine, FileText, ClipboardList,
-  User, Building2, BadgeCheck, AlertCircle, ArrowLeft, X,
+  User, Building2, BadgeCheck, AlertCircle, ArrowLeft, X, XCircle,
   Globe, Phone, CheckCircle2, Download, ArrowRightCircle, ChevronDown, ChevronUp,
   CreditCard, Calendar, MapPin, Hash, Banknote, Tag
 } from "lucide-react";
@@ -30,6 +30,7 @@ const statusColors: Record<string, string> = {
   contacted: "bg-blue-100 text-blue-700 border-blue-200",
   converted_to_complaint: "bg-emerald-100 text-emerald-700 border-emerald-200",
   rejected: "bg-rose-100 text-rose-700 border-rose-200",
+  terminated: "bg-rose-100 text-rose-700 border-rose-300 dark:bg-rose-950 dark:text-rose-300",
 };
 
 const typeLabels: Record<string, string> = {
@@ -604,6 +605,62 @@ const PublicVerify = ({ onClose, overrideId }: { onClose?: () => void, overrideI
                           <h4 className="text-sm font-bold text-sky-950">Service Request Active in Queue</h4>
                           <p className="text-xs text-sky-700 mt-0.5">
                             {result.data.message || "Your service request is active and in queue. Our technical support team is processing your request."}
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Staff Status Banners */}
+                  {result.type === "staff" && result.data.status?.toLowerCase() === "terminated" && (
+                    <div className="p-5 rounded-2xl bg-rose-50 border border-rose-200 text-rose-900 shadow-sm mb-4">
+                      <div className="flex items-center gap-3.5">
+                        <div className="w-10 h-10 rounded-xl bg-rose-100 text-rose-700 flex items-center justify-center shrink-0">
+                          <XCircle className="w-5 h-5" />
+                        </div>
+                        <div>
+                          <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-rose-100 text-rose-800 text-[10px] font-bold uppercase tracking-wider mb-0.5">
+                            Status: TERMINATED (ملازمت ختم)
+                          </span>
+                          <h4 className="text-sm font-bold text-rose-950">Employment Terminated</h4>
+                          <p className="text-xs text-rose-700 mt-0.5">
+                            This person is no longer employed by or authorized to represent Electric Complaint Solutions (ECS).
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                  {result.type === "staff" && result.data.status?.toLowerCase() === "active" && (
+                    <div className="p-5 rounded-2xl bg-emerald-50 border border-emerald-200 text-emerald-900 shadow-sm mb-4">
+                      <div className="flex items-center gap-3.5">
+                        <div className="w-10 h-10 rounded-xl bg-emerald-100 text-emerald-700 flex items-center justify-center shrink-0">
+                          <CheckCircle2 className="w-5 h-5" />
+                        </div>
+                        <div>
+                          <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-emerald-100 text-emerald-800 text-[10px] font-bold uppercase tracking-wider mb-0.5">
+                            Status: ACTIVE (تصدیق شدہ ملازم)
+                          </span>
+                          <h4 className="text-sm font-bold text-emerald-950">Officially Verified Active Employee</h4>
+                          <p className="text-xs text-emerald-700 mt-0.5">
+                            This employee is active and in good standing with Electric Complaint Solutions (ECS).
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                  {result.type === "staff" && result.data.status?.toLowerCase() === "inactive" && (
+                    <div className="p-5 rounded-2xl bg-amber-50 border border-amber-200 text-amber-900 shadow-sm mb-4">
+                      <div className="flex items-center gap-3.5">
+                        <div className="w-10 h-10 rounded-xl bg-amber-100 text-amber-700 flex items-center justify-center shrink-0">
+                          <AlertCircle className="w-5 h-5" />
+                        </div>
+                        <div>
+                          <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-amber-100 text-amber-800 text-[10px] font-bold uppercase tracking-wider mb-0.5">
+                            Status: INACTIVE (غیر فعال)
+                          </span>
+                          <h4 className="text-sm font-bold text-amber-950">Profile Currently Inactive</h4>
+                          <p className="text-xs text-amber-700 mt-0.5">
+                            This employee profile is currently marked as inactive in company records.
                           </p>
                         </div>
                       </div>

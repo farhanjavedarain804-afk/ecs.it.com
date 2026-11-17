@@ -26,7 +26,11 @@ const ensureStaffColumns = async () => {
             { name: 'profile_photo', def: 'TEXT DEFAULT NULL' },
             { name: 'doc_cnic', def: 'TEXT DEFAULT NULL' },
             { name: 'doc_resume', def: 'TEXT DEFAULT NULL' },
-            { name: 'doc_appointment', def: 'TEXT DEFAULT NULL' }
+            { name: 'doc_appointment', def: 'TEXT DEFAULT NULL' },
+            { name: 'termination_reason', def: 'TEXT DEFAULT NULL' },
+            { name: 'terminated_at', def: 'DATETIME DEFAULT NULL' },
+            { name: 'terminated_by', def: 'VARCHAR(255) DEFAULT NULL' },
+            { name: 'status_changed_at', def: 'DATETIME DEFAULT NULL' }
         ];
 
         for (const col of newCols) {
@@ -173,10 +177,13 @@ router.patch('/:id', auth(['super_admin', 'manager', 'branch_admin']), async (re
             if (current[0].branch_id !== req.user.branch_id) {
                 return res.status(403).json({ error: 'Forbidden' });
             }
-            // Branch admins can't edit staff after 2 hours
-            const hoursSinceCreation = (new Date() - new Date(current[0].created_at)) / (1000 * 60 * 60);
-            if (hoursSinceCreation > 2) {
-                return res.status(403).json({ error: 'Update locked: Branch Admins cannot edit records older than 2 hours.' });
+            // Branch admins can't edit staff after 2 hours (allow status / termination updates anytime)
+            const isStatusOnly = Object.keys(updates).every(k => ['status', 'termination_reason', 'terminated_at', 'terminated_by', 'status_changed_at', 'notes'].includes(k));
+            if (!isStatusOnly) {
+                const hoursSinceCreation = (new Date() - new Date(current[0].created_at)) / (1000 * 60 * 60);
+                if (hoursSinceCreation > 2) {
+                    return res.status(403).json({ error: 'Update locked: Branch Admins cannot edit records older than 2 hours.' });
+                }
             }
             
             // Mask salary from updates if attempted
