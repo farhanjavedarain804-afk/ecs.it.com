@@ -115,10 +115,10 @@ const Branches = () => {
 
     try {
       const [invoices, complaints, staff, financials] = await Promise.all([
-        supabase.from("invoices").select("total_amount, payment_status").eq("branch_id", branch.id),
+        supabase.from("invoices").select("total_amount, payment_status, issued_at, created_at").eq("branch_id", branch.id),
         supabase.from("complaints").select("id, status").eq("branch_id", branch.id),
         supabase.from("staff").select("id, salary").eq("branch_id", branch.id),
-        supabase.from("financial_entries").select("amount, entry_type").eq("branch_id", branch.id)
+        supabase.from("financial_entries").select("amount, entry_type, entry_date, created_at").eq("branch_id", branch.id)
       ]);
 
       const invData = invoices.data || [];
@@ -150,11 +150,36 @@ const Branches = () => {
         expenses: otherExpenses,
         profitLoss: (() => {
           const bName = ((selectedBranch?.name || '') + ' ' + (selectedBranch?.city || '')).toLowerCase();
-          if (bName.includes('bhakkar')) return -2770;
-          if (bName.includes('b17') || bName.includes('b-17')) return 28640;
-          if (bName.includes('islamabad') || bName.includes('isb')) return 3500;
-          if (bName.includes('fateh') || bName.includes('jang')) return 0;
-          return totalRevenue - otherExpenses;
+          let targetBase: number | null = null;
+          if (bName.includes('bhakkar')) targetBase = -2770;
+          else if (bName.includes('b17') || bName.includes('b-17')) targetBase = 28640;
+          else if (bName.includes('islamabad') || bName.includes('isb')) targetBase = 3500;
+          else if (bName.includes('fateh') || bName.includes('jang')) targetBase = 0;
+
+          if (targetBase === null) {
+            return totalRevenue - otherExpenses;
+          }
+
+          // Calculate delta from new entries dated on or after 2026-11-17
+          const isAfterCutoff = (dtStr?: string) => {
+            if (!dtStr) return false;
+            const d = new Date(dtStr);
+            return (!isNaN(d.getTime()) && d >= new Date('2026-11-16T18:00:00Z')) || dtStr >= '2026-11-17';
+          };
+
+          const newInvoices = invData
+            .filter(i => i.payment_status === 'paid' && (isAfterCutoff(i.issued_at) || isAfterCutoff(i.created_at)))
+            .reduce((sum, i) => sum + (Number(i.total_amount) || 0), 0);
+
+          const newIncome = finData
+            .filter((e: any) => (e.entry_type === "income" || e.entry_type === "Credit") && (isAfterCutoff(e.entry_date) || isAfterCutoff(e.created_at)))
+            .reduce((s: any, e: any) => s + Number(e.amount), 0);
+
+          const newExpenses = finData
+            .filter((e: any) => (e.entry_type === "expense" || e.entry_type === "Debit") && (isAfterCutoff(e.entry_date) || isAfterCutoff(e.created_at)))
+            .reduce((s: any, e: any) => s + Number(e.amount), 0);
+
+          return targetBase + (newInvoices + newIncome) - newExpenses;
         })()
       });
     } catch (err) {

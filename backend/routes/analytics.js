@@ -164,10 +164,25 @@ router.get('/', auth(), async (req, res) => {
 
                     let bProfit = rev - exp;
                     const bNameLower = ((b.name || '') + ' ' + (b.city || '')).toLowerCase();
-                    if (bNameLower.includes('bhakkar')) bProfit = -2770;
-                    else if (bNameLower.includes('b17') || bNameLower.includes('b-17')) bProfit = 28640;
-                    else if (bNameLower.includes('islamabad') || bNameLower.includes('isb')) bProfit = 3500;
-                    else if (bNameLower.includes('fateh') || bNameLower.includes('jang')) bProfit = 0;
+                    let targetBase = null;
+                    if (bNameLower.includes('bhakkar')) targetBase = -2770;
+                    else if (bNameLower.includes('b17') || bNameLower.includes('b-17')) targetBase = 28640;
+                    else if (bNameLower.includes('islamabad') || bNameLower.includes('isb')) targetBase = 3500;
+                    else if (bNameLower.includes('fateh') || bNameLower.includes('jang')) targetBase = 0;
+
+                    if (targetBase !== null) {
+                        const isAfterCutoff = (dtStr) => {
+                            if (!dtStr) return false;
+                            const d = new Date(dtStr);
+                            return (!isNaN(d.getTime()) && d >= new Date('2026-11-16T18:00:00Z')) || dtStr >= '2026-11-17';
+                        };
+
+                        const newRev = bInv.filter(i => i.payment_status === 'paid' && (isAfterCutoff(i.issued_at) || isAfterCutoff(i.created_at))).reduce((s, i) => s + Number(i.total_amount || 0), 0)
+                                     + bFin.filter(f => (f.entry_type === 'income' || f.entry_type === 'Credit') && (isAfterCutoff(f.entry_date) || isAfterCutoff(f.created_at))).reduce((s, e) => s + Number(e.amount || 0), 0);
+                        const newExp = bFin.filter(f => (f.entry_type === 'expense' || f.entry_type === 'Debit') && (isAfterCutoff(f.entry_date) || isAfterCutoff(f.created_at))).reduce((s, e) => s + Number(e.amount || 0), 0);
+                        
+                        bProfit = targetBase + newRev - newExp;
+                    }
 
                     return {
                         id: b.id, name: b.name, revenue: rev, expenses: exp, profit: bProfit,
