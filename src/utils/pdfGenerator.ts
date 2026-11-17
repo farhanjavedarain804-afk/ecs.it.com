@@ -476,17 +476,8 @@ export const generatePDF = async (type: 'welcome_note' | 'complaint_receipt' | '
 
         const vId = data.verification_id || data.id || "ECS-VERIFY-000";
         const qrData = `${window.location.origin}/verify?id=${vId}`;
-        try {
-            const qrCodeUrl = await QRCode.toDataURL(qrData);
-            doc.addImage(qrCodeUrl, 'PNG', pageWidth / 2 - 15, 10, 30, 30);
-            doc.setFontSize(7);
-            doc.setTextColor(150);
-            doc.text("Scan to Verify", pageWidth / 2, 42, { align: "center" });
-        } catch (err) {
-            console.error("QR Generation failed", err);
-        }
 
-        let infoY = 50;
+        let infoY = 42;
         doc.setFontSize(8);
         doc.setFont("helvetica", "bold");
         doc.setTextColor(50);
@@ -628,6 +619,40 @@ export const generatePDF = async (type: 'welcome_note' | 'complaint_receipt' | '
         doc.line(15, y, pageWidth - 15, y);
 
         y += 10;
+        const totalsStartY = y;
+
+        // Position QR Code in the empty space above "Terms & Notes" on the left
+        const qrLeftX = 15;
+        const qrSize = 25;
+        try {
+            const qrCodeUrl = await QRCode.toDataURL(qrData);
+            doc.addImage(qrCodeUrl, 'PNG', qrLeftX, totalsStartY, qrSize, qrSize);
+
+            // Verification Details beside QR Code
+            doc.setFontSize(8.5);
+            doc.setFont("helvetica", "bold");
+            doc.setTextColor("#1e3a8a");
+            doc.text("Scan to Verify Invoice", qrLeftX + qrSize + 4, totalsStartY + 6);
+
+            doc.setFontSize(7.5);
+            doc.setFont("helvetica", "normal");
+            doc.setTextColor(100);
+            doc.text("Official Digital Document Verification", qrLeftX + qrSize + 4, totalsStartY + 11.5);
+
+            doc.setFont("helvetica", "bold");
+            doc.setTextColor(80);
+            doc.text("Verification ID:", qrLeftX + qrSize + 4, totalsStartY + 17);
+            doc.setFont("helvetica", "normal");
+            doc.setTextColor(30);
+            doc.text(String(vId), qrLeftX + qrSize + 4, totalsStartY + 21.5);
+
+            doc.setFontSize(6.5);
+            doc.setTextColor(120);
+            doc.text("Scan using camera to verify authenticity", qrLeftX + qrSize + 4, totalsStartY + 26);
+        } catch (err) {
+            console.error("QR Generation failed", err);
+        }
+
         const totalsX = pageWidth - 65;
         const drawTotalRow = (label: string, value: string, isBold = false) => {
             doc.setFont("helvetica", isBold ? "bold" : "normal");
