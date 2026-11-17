@@ -2,7 +2,7 @@ import { jsPDF } from "jspdf";
 import QRCode from "qrcode";
 import { loadLogoForPDF } from "./logoLoader";
 
-export const generatePDF = async (type: 'welcome_note' | 'complaint_receipt' | 'employee_letter' | 'invoice' | 'salary_slip', data: any) => {
+export const generatePDF = async (type: 'welcome_note' | 'complaint_receipt' | 'employee_letter' | 'invoice' | 'salary_slip' | 'employee_record', data: any) => {
     const doc = new jsPDF();
     const pageWidth = doc.internal.pageSize.getWidth();
     const pageHeight = doc.internal.pageSize.getHeight();
@@ -49,7 +49,7 @@ export const generatePDF = async (type: 'welcome_note' | 'complaint_receipt' | '
     }
 
     // 2. Add Branding (Skip for invoice as it has a custom header)
-    if (type !== 'invoice' && type !== 'salary_slip' && type !== 'complaint_receipt') {
+    if (type !== 'invoice' && type !== 'salary_slip' && type !== 'complaint_receipt' && type !== 'employee_record') {
         addLogo(20, 10, 45, 18);
 
         doc.setFontSize(22);
@@ -349,6 +349,323 @@ export const generatePDF = async (type: 'welcome_note' | 'complaint_receipt' | '
         doc.setTextColor(80);
         const termsText = "1. Technical inspection will be conducted as per ECS standard quality guidelines. 2. Real-time complaint progress can be tracked anytime by scanning the QR code above or visiting our official portal. 3. Please retain this official receipt for device collection and future warranty reference.";
         doc.text(termsText, 15, footerY, { maxWidth: pageWidth - 30 });
+
+        // Divider Line
+        footerY = doc.internal.pageSize.getHeight() - 35;
+        doc.setLineWidth(0.1);
+        doc.setDrawColor(200);
+        doc.line(15, footerY, pageWidth - 15, footerY);
+        footerY += 5;
+
+        // Head Office Line
+        doc.setFontSize(8);
+        doc.setFont("helvetica", "normal");
+        doc.setTextColor(100);
+        doc.text(`Head Office: ${settings.company_address || '1st Floor, Zain Plaza, Islamabad'} | Tel: ${settings.company_phone || '+92 310 1111 327'} | Email: ${settings.company_email || 'ecs.isbpak@gmail.com'}`, pageWidth / 2, footerY, { align: "center" });
+
+        // Devionic Attribution Line
+        footerY += 6;
+        doc.setFontSize(8);
+        doc.setTextColor(100);
+        doc.setFont("helvetica", "bold");
+        doc.text("This Software is Developed by Devionic ( Private ) Limited | +92-317-7121841 | devionic.com", pageWidth / 2, footerY, { align: "center" });
+    }
+    else if (type === 'employee_record') {
+        // --- 1. HEADER SECTION ---
+        // Left Side: Company Official Logo
+        addLogo(15, 10, 42, 17);
+
+        // Center: Company Name & Subtitle
+        doc.setFontSize(15);
+        doc.setFont("helvetica", "bold");
+        doc.setTextColor(30, 58, 138); // Deep Navy Blue #1e3a8a
+        doc.text((settings.company_name || "ELECTRIC COMPLAINT SOLUTIONS").toUpperCase(), pageWidth / 2, 18, { align: "center" });
+
+        doc.setFontSize(7.5);
+        doc.setFont("helvetica", "normal");
+        doc.setTextColor(110);
+        doc.text("Human Resources Department | Employee Master Profile & Service Record", pageWidth / 2, 23, { align: "center" });
+
+        // Center: Document Title Banner
+        doc.setFillColor(30, 58, 138);
+        doc.roundedRect(pageWidth / 2 - 45, 26, 90, 7.5, 2, 2, 'F');
+        doc.setFontSize(9.5);
+        doc.setFont("helvetica", "bold");
+        doc.setTextColor(255, 255, 255);
+        doc.text("EMPLOYEE PROFILE & SERVICE RECORD", pageWidth / 2, 31.2, { align: "center" });
+
+        // Right Side: Dynamic QR Code
+        const empCode = data.employee_id || data.id || "ECS-STF-000";
+        const qrData = `${window.location.origin}/verify?id=${empCode}`;
+        try {
+            const qrCodeUrl = await QRCode.toDataURL(qrData);
+            doc.addImage(qrCodeUrl, 'PNG', pageWidth - 42, 10, 27, 27);
+            doc.setFontSize(6.5);
+            doc.setFont("helvetica", "bold");
+            doc.setTextColor(120);
+            doc.text("Scan to Verify", pageWidth - 28.5, 39, { align: "center" });
+        } catch (err) {
+            console.error("QR Generation failed", err);
+        }
+
+        // Header Accent Divider Line
+        doc.setDrawColor(30, 58, 138);
+        doc.setLineWidth(0.7);
+        doc.line(15, 43, pageWidth - 15, 43);
+
+        // --- 2. PRIMARY IDENTIFIER BANNER ---
+        const bannerY = 47;
+        doc.setFillColor(245, 248, 252);
+        doc.roundedRect(15, bannerY, pageWidth - 30, 14, 2, 2, 'F');
+        doc.setDrawColor(215, 225, 240);
+        doc.setLineWidth(0.3);
+        doc.roundedRect(15, bannerY, pageWidth - 30, 14, 2, 2, 'S');
+
+        // Column 1: Employee ID
+        doc.setFontSize(7.5);
+        doc.setFont("helvetica", "bold");
+        doc.setTextColor(100);
+        doc.text("EMPLOYEE ID", 20, bannerY + 5);
+        doc.setFontSize(10.5);
+        doc.setFont("helvetica", "bold");
+        doc.setTextColor(30, 58, 138);
+        doc.text(String(data.employee_id || 'N/A'), 20, bannerY + 10.5);
+
+        // Column 2: Joining Date
+        const joinDate = data.joining_date ? new Date(data.joining_date).toLocaleDateString('en-US', {
+            year: 'numeric', month: 'short', day: '2-digit'
+        }) : 'N/A';
+        doc.setFontSize(7.5);
+        doc.setFont("helvetica", "bold");
+        doc.setTextColor(100);
+        doc.text("JOINING DATE", 80, bannerY + 5);
+        doc.setFontSize(8.5);
+        doc.setFont("helvetica", "normal");
+        doc.setTextColor(30);
+        doc.text(joinDate, 80, bannerY + 10.5);
+
+        // Column 3: Department
+        doc.setFontSize(7.5);
+        doc.setFont("helvetica", "bold");
+        doc.setTextColor(100);
+        doc.text("DEPARTMENT", 135, bannerY + 5);
+        doc.setFontSize(8.5);
+        doc.setFont("helvetica", "bold");
+        doc.setTextColor(30);
+        doc.text(String(data.department || 'Operations').toUpperCase(), 135, bannerY + 10.5);
+
+        // Column 4: Status
+        doc.setFontSize(7.5);
+        doc.setFont("helvetica", "bold");
+        doc.setTextColor(100);
+        doc.text("STATUS", pageWidth - 20, bannerY + 5, { align: "right" });
+        doc.setFontSize(8.5);
+        doc.setFont("helvetica", "bold");
+        if (data.status === 'active') {
+            doc.setTextColor(16, 120, 72);
+        } else if (data.status === 'terminated') {
+            doc.setTextColor(180, 20, 20);
+        } else {
+            doc.setTextColor(100);
+        }
+        doc.text(String(data.status || 'Active').toUpperCase(), pageWidth - 20, bannerY + 10.5, { align: "right" });
+
+        // --- 3. TWO-COLUMN PROFILE CARDS ---
+        const cardsY = 65;
+        const colWidth = (pageWidth - 30 - 6) / 2; // 87 mm each
+        const leftColX = 15;
+        const rightColX = 15 + colWidth + 6;
+        const cardHeight = 68;
+
+        const renderField = (label: string, value: string, xPos: number, currentY: number, maxW: number = 55) => {
+            doc.setFontSize(7.5);
+            doc.setFont("helvetica", "bold");
+            doc.setTextColor(100);
+            doc.text(label, xPos + 5, currentY);
+            doc.setFont("helvetica", "normal");
+            doc.setTextColor(20);
+            const truncated = doc.splitTextToSize(String(value || 'N/A'), maxW)[0] || 'N/A';
+            doc.text(truncated, xPos + 31, currentY);
+        };
+
+        // --- Left Card: Personal & Identity Details ---
+        doc.setFillColor(255, 255, 255);
+        doc.roundedRect(leftColX, cardsY, colWidth, cardHeight, 2, 2, 'F');
+        doc.setDrawColor(220, 225, 235);
+        doc.setLineWidth(0.3);
+        doc.roundedRect(leftColX, cardsY, colWidth, cardHeight, 2, 2, 'S');
+
+        doc.setFillColor(30, 58, 138);
+        doc.roundedRect(leftColX, cardsY, colWidth, 7, 2, 2, 'F');
+        doc.setFontSize(8.5);
+        doc.setFont("helvetica", "bold");
+        doc.setTextColor(255, 255, 255);
+        doc.text("PERSONAL & IDENTITY DETAILS", leftColX + 5, cardsY + 5);
+
+        let pY = cardsY + 13;
+        renderField("Full Name:", data.full_name || 'N/A', leftColX, pY); pY += 6.8;
+        renderField("Father Name:", data.father_name || 'N/A', leftColX, pY); pY += 6.8;
+        renderField("CNIC Number:", data.cnic || 'N/A', leftColX, pY); pY += 6.8;
+        renderField("Date of Birth:", data.dob ? new Date(data.dob).toLocaleDateString() : 'N/A', leftColX, pY); pY += 6.8;
+        renderField("Gender:", data.gender || 'Male', leftColX, pY); pY += 6.8;
+        renderField("Marital Status:", data.marital_status || 'Single', leftColX, pY); pY += 6.8;
+        renderField("Blood Group:", data.blood_group || 'N/A', leftColX, pY); pY += 6.8;
+        renderField("Email Address:", data.email || 'N/A', leftColX, pY, 52); pY += 6.8;
+        renderField("Contact 1:", data.contact_1 || 'N/A', leftColX, pY);
+
+        // --- Right Card: Job & Payroll Specifications ---
+        doc.setFillColor(255, 255, 255);
+        doc.roundedRect(rightColX, cardsY, colWidth, cardHeight, 2, 2, 'F');
+        doc.setDrawColor(220, 225, 235);
+        doc.setLineWidth(0.3);
+        doc.roundedRect(rightColX, cardsY, colWidth, cardHeight, 2, 2, 'S');
+
+        doc.setFillColor(30, 58, 138);
+        doc.roundedRect(rightColX, cardsY, colWidth, 7, 2, 2, 'F');
+        doc.setFontSize(8.5);
+        doc.setFont("helvetica", "bold");
+        doc.setTextColor(255, 255, 255);
+        doc.text("JOB, OPERATIONS & PAYROLL", rightColX + 5, cardsY + 5);
+
+        let jY = cardsY + 13;
+        const branchTxt = data.branches?.name || data.branch_name || 'Main Office';
+        const salaryTxt = data.salary ? `Rs. ${Number(data.salary).toLocaleString()}` : 'Confidential';
+        const allowanceTxt = data.allowances ? `Rs. ${Number(data.allowances).toLocaleString()}` : 'N/A';
+
+        renderField("Branch:", branchTxt, rightColX, jY, 52); jY += 6.8;
+        renderField("Designation:", data.designation || 'N/A', rightColX, jY); jY += 6.8;
+        renderField("Employment:", data.employment_type || 'Full-Time', rightColX, jY); jY += 6.8;
+        renderField("Shift Timing:", data.shift_timing || 'Morning', rightColX, jY); jY += 6.8;
+        renderField("Supervisor:", data.reporting_manager || 'Branch Manager', rightColX, jY); jY += 6.8;
+        renderField("Payment Mode:", data.payment_mode || 'Bank Transfer', rightColX, jY); jY += 6.8;
+        renderField("Bank Name:", data.bank_name || 'N/A', rightColX, jY); jY += 6.8;
+        renderField("Account/IBAN:", data.account_number || 'N/A', rightColX, jY, 52); jY += 6.8;
+        renderField("Basic Salary:", salaryTxt, rightColX, jY);
+
+        // --- 4. ADDRESSES & EMERGENCY CONTACT ROW ---
+        const addrY = cardsY + cardHeight + 5; // ~138 mm
+        const addrH = 26;
+
+        // Left Box: Addresses
+        doc.setFillColor(255, 255, 255);
+        doc.roundedRect(leftColX, addrY, colWidth, addrH, 2, 2, 'F');
+        doc.setDrawColor(220, 225, 235);
+        doc.setLineWidth(0.3);
+        doc.roundedRect(leftColX, addrY, colWidth, addrH, 2, 2, 'S');
+
+        doc.setFillColor(245, 248, 252);
+        doc.roundedRect(leftColX, addrY, colWidth, 6, 2, 2, 'F');
+        doc.setFontSize(7.5);
+        doc.setFont("helvetica", "bold");
+        doc.setTextColor(30, 58, 138);
+        doc.text("RESIDENTIAL ADDRESSES", leftColX + 5, addrY + 4.5);
+
+        let adY = addrY + 10;
+        doc.setFontSize(7);
+        doc.setFont("helvetica", "bold");
+        doc.setTextColor(100);
+        doc.text("Permanent:", leftColX + 5, adY);
+        doc.setFont("helvetica", "normal");
+        doc.setTextColor(30);
+        doc.text(doc.splitTextToSize(String(data.address || 'N/A'), colWidth - 28)[0] || 'N/A', leftColX + 26, adY);
+
+        adY += 6.5;
+        doc.setFont("helvetica", "bold");
+        doc.setTextColor(100);
+        doc.text("Current / Temp:", leftColX + 5, adY);
+        doc.setFont("helvetica", "normal");
+        doc.setTextColor(30);
+        doc.text(doc.splitTextToSize(String(data.current_address || data.address || 'N/A'), colWidth - 32)[0] || 'N/A', leftColX + 30, adY);
+
+        // Right Box: Emergency Contact
+        doc.setFillColor(255, 255, 255);
+        doc.roundedRect(rightColX, addrY, colWidth, addrH, 2, 2, 'F');
+        doc.setDrawColor(220, 225, 235);
+        doc.setLineWidth(0.3);
+        doc.roundedRect(rightColX, addrY, colWidth, addrH, 2, 2, 'S');
+
+        doc.setFillColor(245, 248, 252);
+        doc.roundedRect(rightColX, addrY, colWidth, 6, 2, 2, 'F');
+        doc.setFontSize(7.5);
+        doc.setFont("helvetica", "bold");
+        doc.setTextColor(30, 58, 138);
+        doc.text("EMERGENCY CONTACT & NEXT OF KIN", rightColX + 5, addrY + 4.5);
+
+        let emY = addrY + 10;
+        renderField("Contact Name:", data.emergency_contact_name || 'N/A', rightColX, emY); emY += 6.5;
+        renderField("Relationship:", data.emergency_relation || 'N/A', rightColX, emY); emY += 6.5;
+        renderField("Emergency Ph:", data.emergency_phone || 'N/A', rightColX, emY);
+
+        // --- 5. DOCUMENTS ON RECORD STRIP ---
+        const docStripY = addrY + addrH + 5; // ~169 mm
+        doc.setFillColor(255, 255, 255);
+        doc.roundedRect(15, docStripY, pageWidth - 30, 20, 2, 2, 'F');
+        doc.setDrawColor(220, 225, 235);
+        doc.setLineWidth(0.3);
+        doc.roundedRect(15, docStripY, pageWidth - 30, 20, 2, 2, 'S');
+
+        doc.setFillColor(245, 248, 252);
+        doc.roundedRect(15, docStripY, pageWidth - 30, 6, 2, 2, 'F');
+        doc.setFontSize(7.5);
+        doc.setFont("helvetica", "bold");
+        doc.setTextColor(30, 58, 138);
+        doc.text("VERIFIED DOCUMENTS ON OFFICIAL RECORD (PDF)", 20, docStripY + 4.5);
+
+        const docBoxW = (pageWidth - 30) / 4;
+        const docItems = [
+            { label: "Profile Photo", status: data.profile_photo ? "On File" : "Pending" },
+            { label: "CNIC Document", status: data.doc_cnic ? "Verified (PDF)" : "Pending" },
+            { label: "CV / Educational", status: data.doc_resume ? "Verified (PDF)" : "Pending" },
+            { label: "Appointment/Contract", status: data.doc_appointment ? "Verified (PDF)" : "Pending" }
+        ];
+
+        docItems.forEach((dItem, idx) => {
+            const dX = 15 + (idx * docBoxW);
+            doc.setFontSize(7);
+            doc.setFont("helvetica", "bold");
+            doc.setTextColor(100);
+            doc.text(dItem.label, dX + 5, docStripY + 11);
+
+            doc.setFontSize(7.5);
+            doc.setFont("helvetica", "bold");
+            if (dItem.status.includes("Verified") || dItem.status.includes("On File")) {
+                doc.setTextColor(16, 120, 72);
+            } else {
+                doc.setTextColor(150);
+            }
+            doc.text(dItem.status, dX + 5, docStripY + 16);
+        });
+
+        // --- 6. AUTHORIZATION & SIGNATURE SECTION ---
+        const signY = docStripY + 24; // ~198 mm
+        const signW = (pageWidth - 30 - 25) / 2;
+
+        // Employee Signature Box
+        doc.setDrawColor(200);
+        doc.setLineWidth(0.3);
+        doc.line(20, signY + 16, 20 + signW, signY + 16);
+        doc.setFontSize(7.5);
+        doc.setFont("helvetica", "bold");
+        doc.setTextColor(80);
+        doc.text("Employee Signature & Declaration", 20 + (signW / 2), signY + 20, { align: "center" });
+
+        // Authorized Officer / Stamp Box
+        doc.line(pageWidth - 20 - signW, signY + 16, pageWidth - 20, signY + 16);
+        doc.text("Authorized HR Officer / Branch Stamp", (pageWidth - 20 - signW) + (signW / 2), signY + 20, { align: "center" });
+
+        // --- 7. FOOTER (EXACT SAME AS INVOICE & COMPLAINT RECEIPT) ---
+        let footerY = doc.internal.pageSize.getHeight() - 55;
+        doc.setFontSize(8.5);
+        doc.setFont("helvetica", "bold");
+        doc.setTextColor("#1e3a8a");
+        doc.text("Official HR Record & Verification Notice:", 15, footerY);
+        footerY += 4.5;
+
+        doc.setFont("helvetica", "normal");
+        doc.setFontSize(7.5);
+        doc.setTextColor(80);
+        const policyText = "1. This document serves as the official master profile record for Electric Complaint Solutions (ECS) Human Resources. 2. Real-time employee verification can be confirmed anytime by scanning the QR code above. 3. Unauthorized modification or falsification of this document is punishable under company policy and applicable laws.";
+        doc.text(policyText, 15, footerY, { maxWidth: pageWidth - 30 });
 
         // Divider Line
         footerY = doc.internal.pageSize.getHeight() - 35;

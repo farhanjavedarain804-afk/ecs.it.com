@@ -1,3 +1,43 @@
+// Helper to automatically ensure all expanded staff columns exist in the DB schema
+const ensureStaffColumns = async () => {
+    try {
+        const [cols] = await pool.query("SHOW COLUMNS FROM staff");
+        const colNames = cols.map(c => c.Field);
+
+        const newCols = [
+            { name: 'dob', def: 'DATE DEFAULT NULL' },
+            { name: 'gender', def: "VARCHAR(20) DEFAULT 'Male'" },
+            { name: 'marital_status', def: "VARCHAR(20) DEFAULT 'Single'" },
+            { name: 'blood_group', def: 'VARCHAR(10) DEFAULT NULL' },
+            { name: 'email', def: 'VARCHAR(255) DEFAULT NULL' },
+            { name: 'current_address', def: 'TEXT DEFAULT NULL' },
+            { name: 'department', def: "VARCHAR(100) DEFAULT 'Operations'" },
+            { name: 'employment_type', def: "VARCHAR(50) DEFAULT 'Full-Time'" },
+            { name: 'shift_timing', def: "VARCHAR(50) DEFAULT 'Morning'" },
+            { name: 'reporting_manager', def: 'VARCHAR(255) DEFAULT NULL' },
+            { name: 'payment_mode', def: "VARCHAR(50) DEFAULT 'Bank Transfer'" },
+            { name: 'bank_name', def: 'VARCHAR(100) DEFAULT NULL' },
+            { name: 'account_title', def: 'VARCHAR(255) DEFAULT NULL' },
+            { name: 'account_number', def: 'VARCHAR(100) DEFAULT NULL' },
+            { name: 'allowances', def: 'DECIMAL(12,2) DEFAULT 0' },
+            { name: 'emergency_contact_name', def: 'VARCHAR(255) DEFAULT NULL' },
+            { name: 'emergency_relation', def: 'VARCHAR(100) DEFAULT NULL' },
+            { name: 'emergency_phone', def: 'VARCHAR(50) DEFAULT NULL' },
+            { name: 'profile_photo', def: 'TEXT DEFAULT NULL' },
+            { name: 'doc_cnic', def: 'TEXT DEFAULT NULL' },
+            { name: 'doc_resume', def: 'TEXT DEFAULT NULL' },
+            { name: 'doc_appointment', def: 'TEXT DEFAULT NULL' }
+        ];
+
+        for (const col of newCols) {
+            if (!colNames.includes(col.name)) {
+                await pool.query(`ALTER TABLE staff ADD COLUMN ${col.name} ${col.def}`);
+            }
+        }
+    } catch (e) {
+        console.error('Error ensuring staff columns:', e.message);
+    }
+};
 const express = require('express');
 const router = express.Router();
 const pool = require('../config/db');
@@ -7,6 +47,7 @@ const auth = require('../middleware/auth');
 // @desc    Get all staff members
 router.get('/', auth(), async (req, res) => {
     try {
+        await ensureStaffColumns();
         const { branch_id, employee_id, status } = req.query;
         let query = 'SELECT s.*, b.name as branch_name FROM staff s LEFT JOIN branches b ON s.branch_id = b.id WHERE 1=1';
         let params = [];
@@ -46,13 +87,19 @@ router.get('/', auth(), async (req, res) => {
 });
 
 // @route   POST /api/staff
-// @desc    Add new staff member
+// @desc    Add new staff member with full identity, job, payroll, emergency, and document details
 router.post('/', auth(['super_admin', 'manager']), async (req, res) => {
     try {
+        await ensureStaffColumns();
         let {
             employee_id, full_name, father_name, cnic, designation,
             branch_id, status, joining_date, salary, contact_1,
-            contact_2, address
+            contact_2, address,
+            dob, gender, marital_status, blood_group, email, current_address,
+            department, employment_type, shift_timing, reporting_manager,
+            payment_mode, bank_name, account_title, account_number, allowances,
+            emergency_contact_name, emergency_relation, emergency_phone,
+            profile_photo, doc_cnic, doc_resume, doc_appointment
         } = req.body;
 
         if (!full_name || !branch_id) {
@@ -75,15 +122,34 @@ router.post('/', auth(['super_admin', 'manager']), async (req, res) => {
             finalBranchId = req.user.branch_id;
         }
 
-        await pool.query(
-            'INSERT INTO staff (id, employee_id, full_name, father_name, cnic, designation, branch_id, status, joining_date, salary, contact_1, contact_2, address) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
-            [id, employee_id, full_name, father_name, cnic, designation, finalBranchId, status || 'active', joining_date, (req.user.role === 'branch_admin' ? 0 : (salary || 0)), contact_1, contact_2, address]
-        );
+        const insertQuery = `
+            INSERT INTO staff (
+                id, employee_id, full_name, father_name, cnic, designation, branch_id, status, 
+                joining_date, salary, contact_1, contact_2, address,
+                dob, gender, marital_status, blood_group, email, current_address,
+                department, employment_type, shift_timing, reporting_manager,
+                payment_mode, bank_name, account_title, account_number, allowances,
+                emergency_contact_name, emergency_relation, emergency_phone,
+                profile_photo, doc_cnic, doc_resume, doc_appointment
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        `;
+
+        const insertParams = [
+            id, employee_id, full_name, father_name || null, cnic || null, designation || null, finalBranchId, status || 'active',
+            joining_date || null, (req.user.role === 'branch_admin' ? 0 : (salary || 0)), contact_1 || null, contact_2 || null, address || null,
+            dob || null, gender || 'Male', marital_status || 'Single', blood_group || null, email || null, current_address || null,
+            department || 'Operations', employment_type || 'Full-Time', shift_timing || 'Morning', reporting_manager || null,
+            payment_mode || 'Bank Transfer', bank_name || null, account_title || null, account_number || null, allowances || 0,
+            emergency_contact_name || null, emergency_relation || null, emergency_phone || null,
+            profile_photo || null, doc_cnic || null, doc_resume || null, doc_appointment || null
+        ];
+
+        await pool.query(insertQuery, insertParams);
 
         res.status(201).json({ id, employee_id, full_name });
     } catch (err) {
         console.error('Staff Creation Error:', err);
-        res.status(500).json({ error: 'Server error' });
+        res.status(500).json({ error: 'Server error: ' + err.message });
     }
 });
 
@@ -91,6 +157,7 @@ router.post('/', auth(['super_admin', 'manager']), async (req, res) => {
 // @desc    Update staff member
 router.patch('/:id', auth(['super_admin', 'manager', 'branch_admin']), async (req, res) => {
     try {
+        await ensureStaffColumns();
         const { id } = req.params;
         const updates = req.body;
 
