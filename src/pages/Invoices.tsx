@@ -2,9 +2,9 @@ import { useState, useEffect } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
-import { Plus, Search, FileText, Calendar, AlertCircle, CheckCircle2, Clock, FileDown, Trash2, PlusCircle, Lock, Check, ChevronsUpDown, Edit2, X, Mail } from "lucide-react";
+import { Plus, Search, FileText, Calendar, AlertCircle, CheckCircle2, Clock, FileDown, Trash2, PlusCircle, Lock, Check, ChevronsUpDown, Edit2, X, Mail, Receipt } from "lucide-react";
 import { logActivity } from "@/utils/logger";
-import { generatePDF } from "@/utils/pdfGenerator";
+import { generatePDF, generateThermalReceipt } from "@/utils/pdfGenerator";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { cn } from "@/lib/utils";
@@ -309,6 +309,36 @@ const Invoices = () => {
 
       fetchAll();
       toast({ title: `Payment marked as ${status}${status === "paid" ? " ðŸ”’ (Locked)" : ""}` });
+
+      // Automatically download thermal receipt slip when marked as paid
+      if (status === "paid") {
+        try {
+          const resInv = await fetch(`${API_URL}/api/invoices/${id}`, {
+            headers: { 'Authorization': `Bearer ${localStorage.getItem('ecs_token')}` }
+          });
+          if (resInv.ok) {
+            const fullInvoice = await resInv.json();
+            await generateThermalReceipt({
+              ...fullInvoice,
+              payment_status: "paid",
+              paid_at: new Date().toISOString(),
+              customer_name: fullInvoice.customers?.name || fullInvoice.customer_name,
+              phone: fullInvoice.customers?.phone || fullInvoice.phone,
+              address: fullInvoice.customers?.address || fullInvoice.address,
+              branch_name: fullInvoice.branches?.name || fullInvoice.branch_name,
+              branch_address: fullInvoice.branches?.address || fullInvoice.branch_address,
+              branch_code: fullInvoice.branches?.branch_code || fullInvoice.branch_code,
+              complaint_number: fullInvoice.complaints?.complaint_number || fullInvoice.complaint_number
+            });
+            toast({
+              title: "Thermal Slip Downloaded",
+              description: `Bank-style payment receipt for ${fullInvoice.invoice_number || 'invoice'} downloaded.`
+            });
+          }
+        } catch (slipErr) {
+          console.error("Auto thermal slip download error:", slipErr);
+        }
+      }
     } catch (err: any) {
       toast({ title: "Connection error", description: err.message, variant: "destructive" });
     }
@@ -379,6 +409,31 @@ const Invoices = () => {
       });
     } catch (err: any) {
       toast({ title: "PDF Error", description: err.message, variant: "destructive" });
+    }
+  };
+
+  const handleDownloadThermalReceipt = async (inv: any) => {
+    const API_URL = import.meta.env.VITE_API_URL ?? '';
+    toast({ title: "Preparing Thermal Slip...", description: "Generating POS payment receipt..." });
+    try {
+      const res = await fetch(`${API_URL}/api/invoices/${inv.id}`, {
+        headers: { 'Authorization': `Bearer ${localStorage.getItem('ecs_token')}` }
+      });
+      if (!res.ok) throw new Error("Failed to fetch invoice details");
+      const fullInvoice = await res.json();
+      await generateThermalReceipt({
+        ...fullInvoice,
+        customer_name: fullInvoice.customers?.name || fullInvoice.customer_name,
+        phone: fullInvoice.customers?.phone || fullInvoice.phone,
+        address: fullInvoice.customers?.address || fullInvoice.address,
+        branch_name: fullInvoice.branches?.name || fullInvoice.branch_name,
+        branch_address: fullInvoice.branches?.address || fullInvoice.branch_address,
+        branch_code: fullInvoice.branches?.branch_code || fullInvoice.branch_code,
+        complaint_number: fullInvoice.complaints?.complaint_number || fullInvoice.complaint_number
+      });
+      toast({ title: "Thermal Slip Ready", description: `Downloaded thermal receipt for ${fullInvoice.invoice_number || 'invoice'}` });
+    } catch (err: any) {
+      toast({ title: "Thermal Receipt Error", description: err.message, variant: "destructive" });
     }
   };
 
@@ -889,9 +944,16 @@ const Invoices = () => {
                         <button
                           onClick={() => handleDownloadInvoice(inv)}
                           className="p-2 rounded-lg bg-primary/10 text-primary hover:bg-primary hover:text-white transition-all shadow-sm active:scale-95"
-                          title="Download Invoice PDF"
+                          title="Download Invoice PDF (A4)"
                         >
                           <FileDown className="w-4 h-4" />
+                        </button>
+                        <button
+                          onClick={() => handleDownloadThermalReceipt(inv)}
+                          className="p-2 rounded-lg bg-emerald-100 text-emerald-700 hover:bg-emerald-600 hover:text-white transition-all shadow-sm active:scale-95"
+                          title="Download Thermal POS Receipt (80mm)"
+                        >
+                          <Receipt className="w-4 h-4" />
                         </button>
                         <button
                           onClick={() => handleSendInvoiceEmail(inv)}
