@@ -1726,7 +1726,388 @@ export const generateThermalReceipt = async (data: any) => {
     const items = Array.isArray(data.items) ? data.items : [];
     const isPaid = (data.payment_status || '').toLowerCase() === 'paid';
     const isPartial = (data.payment_status || '').toLowerCase() === 'partial';
-    const receiptHeight = Math.max(185, 140 + (items.length * 6.5) + (isPartial ? 16 : 0));
+
+    let settings = {
+        company_name: 'Electric Complaint Solutions',
+        company_address: '1st Floor, Zain Plaza, Islamabad',
+        company_phone: '+92 310 1111 327',
+        company_email: 'ecs.isbpak@gmail.com',
+        bank_name: 'Habib Bank Limited',
+        account_title: 'ECS (PVT) Ltd',
+        iban: '0050417901614255',
+        tax_id: '3220139033321',
+        terms_and_conditions: 'Thank you for your business!'
+    };
+
+    try {
+        const res = await fetch(`${import.meta.env.VITE_API_URL ?? ''}/api/company_settings`, {
+            headers: { "Authorization": `Bearer ${localStorage.getItem("ecs_token")}` }
+        });
+        if (res.ok) {
+            const compData = await res.json();
+            const comp = Array.isArray(compData) ? compData[0] : compData;
+            if (comp) settings = { ...settings, ...comp };
+        }
+    } catch (err) {
+        console.error("Error fetching settings for thermal receipt:", err);
+    }
+
+    const vId = data.verification_id || data.id || "ECS-TXN-000";
+    const qrData = `${window.location.origin}/verify?id=${vId}`;
+    const branchName = data.branch_name || data.branches?.name || 'Main Branch';
+    const branchCode = data.branch_code || data.branches?.branch_code || '';
+    const invoiceNo = data.invoice_number || 'N/A';
+    const complaintNo = data.complaint_number || data.complaints?.complaint_number || 'Direct Billing';
+    const customerName = data.customer_name || data.customers?.name || 'Valued Customer';
+    const phone = data.phone || data.customers?.phone || 'N/A';
+
+    const logoBase64 = await loadLogoForPDF('/LOGO.png');
+    let qrCodeUrl = '';
+    try {
+        qrCodeUrl = await QRCode.toDataURL(qrData);
+    } catch (qrErr) {
+        console.error("QR Code Generation Error in Thermal Slip:", qrErr);
+    }
+
+    // Helper to render entire content onto any jsPDF document and return final Y position
+    const renderSlipContent = (doc: jsPDF): number => {
+        let y = 8;
+
+        // Mini logo or brand mark
+        if (logoBase64) {
+            try {
+                doc.addImage(logoBase64, 'PNG', 32, y, 16, 12);
+                y += 14;
+            } catch {
+                // fallback
+            }
+        }
+
+        // Header Details
+        doc.setFontSize(10);
+        doc.setFont("helvetica", "bold");
+        doc.setTextColor(30, 58, 138); // Deep Navy
+        doc.text((settings.company_name || 'ECS PAKISTAN').toUpperCase(), 40, y, { align: "center" });
+
+        y += 4.2;
+        doc.setFontSize(7);
+        doc.setFont("helvetica", "bold");
+        doc.setTextColor(80);
+        doc.text("CUSTOMER PAYMENT RECEIPT", 40, y, { align: "center" });
+
+        y += 3.5;
+        doc.setFontSize(6.5);
+        doc.setFont("helvetica", "normal");
+        doc.setTextColor(100);
+        doc.text(`Branch: ${branchName}${branchCode ? ` (${branchCode})` : ''}`, 40, y, { align: "center" });
+
+        y += 3.2;
+        doc.text(`Helpline: ${settings.company_phone || '+92 310 1111 327'}`, 40, y, { align: "center" });
+
+        y += 3.2;
+        doc.text(`Email: ${settings.company_email || 'ecs.isbpak@gmail.com'}`, 40, y, { align: "center" });
+
+        y += 4;
+        const drawDashedLine = (currentY: number) => {
+            // @ts-ignore
+            if (typeof doc.setLineDashPattern === 'function') {
+                // @ts-ignore
+                doc.setLineDashPattern([1.2, 1.2], 0);
+            }
+            doc.setDrawColor(180);
+            doc.setLineWidth(0.3);
+            doc.line(5, currentY, 75, currentY);
+            // @ts-ignore
+            if (typeof doc.setLineDashPattern === 'function') {
+                // @ts-ignore
+                doc.setLineDashPattern([], 0);
+            }
+        };
+
+        drawDashedLine(y);
+        y += 4;
+
+        // Official Status Stamp Box
+        const paidAt = data.paid_at || data.updated_at || data.created_at || new Date().toISOString();
+        const paidDateFormatted = new Date(paidAt).toLocaleDateString('en-GB', {
+            day: '2-digit', month: 'short', year: 'numeric'
+        }) + ' ' + new Date(paidAt).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
+
+        const dueDateFormatted = data.due_date ? new Date(data.due_date).toLocaleDateString('en-GB', {
+            day: '2-digit', month: 'short', year: 'numeric'
+        }) : 'As per agreement';
+
+        if (isPaid) {
+            doc.setFillColor(240, 253, 244);
+            doc.setDrawColor(22, 163, 74);
+            doc.setLineWidth(0.6);
+            doc.roundedRect(6, y, 68, 12.5, 2, 2, 'FD');
+
+            doc.setFontSize(10);
+            doc.setFont('helvetica', 'bold');
+            doc.setTextColor(22, 163, 74);
+            doc.text('★ OFFICIAL PAYMENT RECEIVED ★', 40, y + 5.5, { align: 'center' });
+
+            doc.setFontSize(6.5);
+            doc.setFont('helvetica', 'normal');
+            doc.setTextColor(30);
+            doc.text(`Paid on: ${paidDateFormatted}`, 40, y + 9.5, { align: 'center' });
+        } else if (isPartial) {
+            doc.setFillColor(254, 243, 199);
+            doc.setDrawColor(217, 119, 6);
+            doc.setLineWidth(0.6);
+            doc.roundedRect(6, y, 68, 14, 2, 2, 'FD');
+
+            doc.setFontSize(9.5);
+            doc.setFont('helvetica', 'bold');
+            doc.setTextColor(180, 83, 9);
+            doc.text('★ PARTIAL PAYMENT RECEIVED ★', 40, y + 4.8, { align: 'center' });
+
+            doc.setFontSize(6.5);
+            doc.setFont('helvetica', 'normal');
+            doc.setTextColor(30);
+            doc.text(`Received on: ${paidDateFormatted}`, 40, y + 8.6, { align: 'center' });
+
+            doc.setFontSize(6.5);
+            doc.setFont('helvetica', 'bold');
+            doc.setTextColor(180, 83, 9);
+            doc.text(`Promised Balance Due: ${dueDateFormatted}`, 40, y + 12.2, { align: 'center' });
+        } else {
+            doc.setFillColor(254, 242, 242);
+            doc.setDrawColor(220, 38, 38);
+            doc.setLineWidth(0.6);
+            doc.roundedRect(6, y, 68, 12.5, 2, 2, 'FD');
+
+            doc.setFontSize(10);
+            doc.setFont('helvetica', 'bold');
+            doc.setTextColor(220, 38, 38);
+            doc.text('✕ UNPAID / DUE NOTICE ✕', 40, y + 5.5, { align: 'center' });
+
+            doc.setFontSize(6.5);
+            doc.setFont('helvetica', 'normal');
+            doc.setTextColor(30);
+            doc.text('Status: Pending Payment', 40, y + 9.5, { align: 'center' });
+        }
+
+        y += 16;
+
+        // Transaction & Reference Grid
+        const metadataRows = [
+            { label: "Transaction / ID:", value: String(vId) },
+            { label: "Invoice Number:", value: String(invoiceNo) },
+            { label: "Complaint #:", value: String(complaintNo) },
+            { label: "Customer Name:", value: String(customerName) },
+            { label: "Phone / Contact:", value: String(phone) },
+            { label: "Payment Method:", value: String(data.payment_method || (isPaid ? "Cash / Counter" : "Pending")) },
+        ];
+
+        metadataRows.forEach(row => {
+            doc.setFontSize(6.5);
+            doc.setFont("helvetica", "bold");
+            doc.setTextColor(100);
+            doc.text(row.label, 6, y);
+
+            doc.setFont("helvetica", "normal");
+            doc.setTextColor(20);
+            const valTrunc = doc.splitTextToSize(row.value, 42)[0] || '';
+            doc.text(valTrunc, 74, y, { align: "right" });
+            y += 4;
+        });
+
+        y += 1;
+        drawDashedLine(y);
+        y += 4;
+
+        // Line Items Table
+        doc.setFontSize(6.5);
+        doc.setFont("helvetica", "bold");
+        doc.setTextColor(50);
+        doc.text("ITEM / DESCRIPTION", 6, y);
+        doc.text("QTY", 48, y, { align: "center" });
+        doc.text("RATE", 60, y, { align: "right" });
+        doc.text("TOTAL", 74, y, { align: "right" });
+
+        y += 3;
+        doc.setDrawColor(210);
+        doc.setLineWidth(0.2);
+        doc.line(6, y, 74, y);
+        y += 3.5;
+
+        doc.setFontSize(6.5);
+        doc.setFont("helvetica", "normal");
+        doc.setTextColor(20);
+
+        items.forEach((item: any) => {
+            const desc = String(item.description || item.name || "Service / Part");
+            const rawQty = item.qty !== undefined ? item.qty : (item.quantity !== undefined ? item.quantity : 1);
+            const qty = isNaN(Number(rawQty)) || Number(rawQty) <= 0 ? 1 : Number(rawQty);
+            const rawPrice = item.unitPrice !== undefined ? item.unitPrice : (item.unit_price !== undefined ? item.unit_price : (item.rate !== undefined ? item.rate : 0));
+            const price = isNaN(Number(rawPrice)) ? 0 : Number(rawPrice);
+            const rawAmount = item.amount !== undefined ? item.amount : (item.total_price !== undefined ? item.total_price : (qty * price));
+            const amount = isNaN(Number(rawAmount)) ? (qty * price) : Number(rawAmount);
+
+            const descLines = doc.splitTextToSize(desc, 38);
+            doc.text(descLines[0] || 'Service', 6, y);
+            doc.text(String(qty), 48, y, { align: "center" });
+            doc.text(price.toLocaleString(), 60, y, { align: "right" });
+            doc.text(amount.toLocaleString(), 74, y, { align: "right" });
+            y += 4;
+        });
+
+        if (items.length === 0) {
+            doc.text("General Electrical Maintenance", 6, y);
+            doc.text("1", 48, y, { align: "center" });
+            doc.text(Number(data.total_amount || 0).toLocaleString(), 60, y, { align: "right" });
+            doc.text(Number(data.total_amount || 0).toLocaleString(), 74, y, { align: "right" });
+            y += 4;
+        }
+
+        y += 1;
+        drawDashedLine(y);
+        y += 4;
+
+        // Financial Summary
+        const subtotal = Number(data.subtotal) || Number(data.total_amount) || 0;
+        const taxRate = Number(data.sales_tax_rate) || 0;
+        const taxAmount = Number(data.tax_amount) || 0;
+        const discount = Number(data.discount_amount) || 0;
+        const advance = Number(data.advance_paid) || 0;
+        const total = Number(data.total_amount) || 0;
+
+        const renderTotalRow = (label: string, val: string, isBold: boolean = false, isGreen: boolean = false, customColor?: [number, number, number]) => {
+            doc.setFontSize(6.8);
+            doc.setFont("helvetica", isBold ? "bold" : "normal");
+            if (customColor) {
+                doc.setTextColor(customColor[0], customColor[1], customColor[2]);
+            } else if (isGreen) {
+                doc.setTextColor(22, 163, 74);
+            } else if (isBold) {
+                doc.setTextColor(20, 30, 60);
+            } else {
+                doc.setTextColor(90);
+            }
+            doc.text(label, 6, y);
+            doc.text(val, 74, y, { align: "right" });
+            y += 4;
+        };
+
+        renderTotalRow("Subtotal:", `Rs. ${subtotal.toLocaleString()}`);
+        if (taxAmount > 0) renderTotalRow(`Sales Tax (${taxRate}%):`, `Rs. ${taxAmount.toLocaleString()}`);
+        if (discount > 0) renderTotalRow("Discount:", `-Rs. ${discount.toLocaleString()}`);
+        if (advance > 0 && !isPartial) renderTotalRow("Advance Paid:", `-Rs. ${advance.toLocaleString()}`);
+
+        doc.setDrawColor(30, 58, 138);
+        doc.setLineWidth(0.4);
+        doc.line(6, y, 74, y);
+        y += 3.5;
+
+        renderTotalRow("NET PAYABLE:", `Rs. ${total.toLocaleString()}`, true);
+
+        if (isPaid) {
+            renderTotalRow("AMOUNT RECEIVED:", `Rs. ${total.toLocaleString()}`, true, true);
+            renderTotalRow("REMAINING BALANCE:", "Rs. 0.00 (CLEARED)", true);
+        } else if (isPartial) {
+            const paidAmount = Number(data.advance_paid) || 0;
+            const remainingBalance = Math.max(0, total - paidAmount);
+
+            renderTotalRow("AMOUNT PAID:", `Rs. ${paidAmount.toLocaleString()}`, true, false, [217, 119, 6]);
+            renderTotalRow("REMAINING BALANCE DUE:", `Rs. ${remainingBalance.toLocaleString()}`, true, false, [220, 38, 38]);
+
+            // Highlighted balance schedule box
+            y += 2;
+            doc.setFillColor(254, 243, 199);
+            doc.setDrawColor(217, 119, 6);
+            doc.setLineWidth(0.5);
+            doc.roundedRect(6, y, 68, 13, 1.5, 1.5, 'FD');
+
+            doc.setFontSize(6.8);
+            doc.setFont('helvetica', 'bold');
+            doc.setTextColor(180, 83, 9);
+            doc.text('REMAINING BALANCE PAYMENT SCHEDULE', 40, y + 4.2, { align: 'center' });
+
+            doc.setFontSize(6.5);
+            doc.setFont('helvetica', 'normal');
+            doc.setTextColor(30);
+            doc.text(`Remaining balance of Rs. ${remainingBalance.toLocaleString()} is due on:`, 40, y + 7.8, { align: 'center' });
+
+            doc.setFontSize(7.5);
+            doc.setFont('helvetica', 'bold');
+            doc.setTextColor(180, 83, 9);
+            doc.text(`${dueDateFormatted}`, 40, y + 11.4, { align: 'center' });
+
+            y += 15.5;
+        } else {
+            renderTotalRow("AMOUNT PAID:", `Rs. ${advance.toLocaleString()}`, true);
+            renderTotalRow("OUTSTANDING BALANCE:", `Rs. ${(total - advance).toLocaleString()}`, true);
+        }
+
+        y += 2;
+        drawDashedLine(y);
+        y += 5;
+
+        // QR Code
+        if (qrCodeUrl) {
+            doc.addImage(qrCodeUrl, 'PNG', 29, y, 22, 22);
+            y += 24;
+
+            doc.setFontSize(6);
+            doc.setFont("helvetica", "bold");
+            doc.setTextColor(30, 58, 138);
+            doc.text("Scan QR to Verify Transaction Slip", 40, y, { align: "center" });
+
+            y += 3;
+            doc.setFont("helvetica", "normal");
+            doc.setTextColor(110);
+            doc.text(`Digital ID: ${vId}`, 40, y, { align: "center" });
+            y += 4;
+        }
+
+        // Footer Section
+        doc.setFontSize(6.5);
+        doc.setFont("helvetica", "bold");
+        doc.setTextColor(50);
+        doc.text("Thank you for choosing ECS!", 40, y, { align: "center" });
+
+        y += 3.5;
+        doc.setFontSize(5.5);
+        doc.setFont("helvetica", "normal");
+        doc.setTextColor(90);
+        doc.text(`Head Office: ${settings.company_address || '1st Floor, Zain Plaza, Islamabad'}`, 40, y, { align: "center" });
+
+        y += 3;
+        doc.text(`Tel: ${settings.company_phone || '+92 310 1111 327'} | Email: ${settings.company_email || 'ecs.isbpak@gmail.com'}`, 40, y, { align: "center" });
+
+        y += 3.5;
+        doc.setFontSize(5.5);
+        doc.setFont("helvetica", "bold");
+        doc.setTextColor(30, 58, 138);
+        doc.text("This Software is Developed by Devionic ( Private ) Limited", 40, y, { align: "center" });
+
+        y += 2.8;
+        doc.setFontSize(5);
+        doc.setFont("helvetica", "normal");
+        doc.setTextColor(100);
+        doc.text("devionic.com | +92-317-7121841", 40, y, { align: "center" });
+
+        y += 3;
+        doc.setFontSize(4.8);
+        doc.setTextColor(130);
+        doc.text("Official System Generated Valid Electronic Transaction Slip", 40, y, { align: "center" });
+
+        return y;
+    };
+
+    // Pass 1: Measure exact content height with scratch doc
+    const measureDoc = new jsPDF({
+        orientation: 'portrait',
+        unit: 'mm',
+        format: [80, 700]
+    });
+    const finalContentY = renderSlipContent(measureDoc);
+    // Exact snug height: exactly 5mm padding after the last text line
+    const receiptHeight = Math.ceil(finalContentY + 5);
+
+    // Pass 2: Create actual receipt document precisely sized to content
     const doc = new jsPDF({
         orientation: 'portrait',
         unit: 'mm',
@@ -1737,7 +2118,7 @@ export const generateThermalReceipt = async (data: any) => {
     doc.setFillColor(255, 255, 255);
     doc.rect(0, 0, 80, receiptHeight, 'F');
 
-    // --- Background Watermark on Thermal Slip (Yellow for Partial, Green for Paid, Red for Unpaid) ---
+    // Background Watermark centered precisely on the snug slip height
     doc.saveGraphicsState();
     let hasGState = false;
     try {
@@ -1779,343 +2160,8 @@ export const generateThermalReceipt = async (data: any) => {
     }
     doc.restoreGraphicsState();
 
-    let settings = {
-        company_name: 'Electric Complaint Solutions',
-        company_address: '1st Floor, Zain Plaza, Islamabad',
-        company_phone: '+92 310 1111 327',
-        company_email: 'ecs.isbpak@gmail.com',
-        bank_name: 'Habib Bank Limited',
-        account_title: 'ECS (PVT) Ltd',
-        iban: '0050417901614255',
-        tax_id: '3220139033321',
-        terms_and_conditions: 'Thank you for your business!'
-    };
-
-    try {
-        const res = await fetch(`${import.meta.env.VITE_API_URL ?? ''}/api/company_settings`, {
-            headers: { "Authorization": `Bearer ${localStorage.getItem("ecs_token")}` }
-        });
-        if (res.ok) {
-            const compData = await res.json();
-            const comp = Array.isArray(compData) ? compData[0] : compData;
-            if (comp) settings = { ...settings, ...comp };
-        }
-    } catch (err) {
-        console.error("Error fetching settings for thermal receipt:", err);
-    }
-
-    const vId = data.verification_id || data.id || "ECS-TXN-000";
-    const qrData = `${window.location.origin}/verify?id=${vId}`;
-    const branchName = data.branch_name || data.branches?.name || 'Main Branch';
-    const branchCode = data.branch_code || data.branches?.branch_code || '';
-    const invoiceNo = data.invoice_number || 'N/A';
-    const complaintNo = data.complaint_number || data.complaints?.complaint_number || 'Direct Billing';
-    const customerName = data.customer_name || data.customers?.name || 'Valued Customer';
-    const phone = data.phone || data.customers?.phone || 'N/A';
-
-    let y = 8;
-
-    // Mini logo or brand mark
-    const logoBase64 = await loadLogoForPDF('/LOGO.png');
-    if (logoBase64) {
-        try {
-            doc.addImage(logoBase64, 'PNG', 32, y, 16, 12);
-            y += 14;
-        } catch {
-            // fallback
-        }
-    }
-
-    // Header Details
-    doc.setFontSize(10);
-    doc.setFont("helvetica", "bold");
-    doc.setTextColor(30, 58, 138); // Deep Navy
-    doc.text((settings.company_name || 'ECS PAKISTAN').toUpperCase(), 40, y, { align: "center" });
-
-    y += 4.2;
-    doc.setFontSize(7);
-    doc.setFont("helvetica", "bold");
-    doc.setTextColor(80);
-    doc.text("CUSTOMER PAYMENT RECEIPT", 40, y, { align: "center" });
-
-    y += 3.5;
-    doc.setFontSize(6.5);
-    doc.setFont("helvetica", "normal");
-    doc.setTextColor(100);
-    doc.text(`Branch: ${branchName}${branchCode ? ` (${branchCode})` : ''}`, 40, y, { align: "center" });
-
-    y += 3.5;
-    doc.text(`Helpline: ${settings.company_phone || '+92 310 1111 327'}`, 40, y, { align: "center" });
-
-    y += 4;
-    const drawDashedLine = (currentY: number) => {
-        // @ts-ignore
-        if (typeof doc.setLineDashPattern === 'function') {
-            // @ts-ignore
-            doc.setLineDashPattern([1.2, 1.2], 0);
-        }
-        doc.setDrawColor(180);
-        doc.setLineWidth(0.3);
-        doc.line(5, currentY, 75, currentY);
-        // @ts-ignore
-        if (typeof doc.setLineDashPattern === 'function') {
-            // @ts-ignore
-            doc.setLineDashPattern([], 0);
-        }
-    };
-
-    drawDashedLine(y);
-    y += 4;
-
-    // --- Official Paid Stamp Box ---
-    const paidAt = data.paid_at || data.updated_at || data.created_at || new Date().toISOString();
-    const paidDateFormatted = new Date(paidAt).toLocaleDateString('en-GB', {
-        day: '2-digit', month: 'short', year: 'numeric'
-    }) + ' ' + new Date(paidAt).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
-
-    const dueDateFormatted = data.due_date ? new Date(data.due_date).toLocaleDateString('en-GB', {
-        day: '2-digit', month: 'short', year: 'numeric'
-    }) : 'As per agreement';
-
-    if (isPaid) {
-        doc.setFillColor(240, 253, 244);
-        doc.setDrawColor(22, 163, 74);
-        doc.setLineWidth(0.6);
-        doc.roundedRect(6, y, 68, 12.5, 2, 2, 'FD');
-
-        doc.setFontSize(10);
-        doc.setFont('helvetica', 'bold');
-        doc.setTextColor(22, 163, 74);
-        doc.text('★ OFFICIAL PAYMENT RECEIVED ★', 40, y + 5.5, { align: 'center' });
-
-        doc.setFontSize(6.5);
-        doc.setFont('helvetica', 'normal');
-        doc.setTextColor(30);
-        doc.text(`Paid on: ${paidDateFormatted}`, 40, y + 9.5, { align: 'center' });
-    } else if (isPartial) {
-        doc.setFillColor(254, 243, 199);
-        doc.setDrawColor(217, 119, 6);
-        doc.setLineWidth(0.6);
-        doc.roundedRect(6, y, 68, 14, 2, 2, 'FD');
-
-        doc.setFontSize(9.5);
-        doc.setFont('helvetica', 'bold');
-        doc.setTextColor(180, 83, 9);
-        doc.text('★ PARTIAL PAYMENT RECEIVED ★', 40, y + 4.8, { align: 'center' });
-
-        doc.setFontSize(6.5);
-        doc.setFont('helvetica', 'normal');
-        doc.setTextColor(30);
-        doc.text(`Received on: ${paidDateFormatted}`, 40, y + 8.6, { align: 'center' });
-
-        doc.setFontSize(6.5);
-        doc.setFont('helvetica', 'bold');
-        doc.setTextColor(180, 83, 9);
-        doc.text(`Balance Due Date: ${dueDateFormatted}`, 40, y + 12.2, { align: 'center' });
-    } else {
-        doc.setFillColor(254, 242, 242);
-        doc.setDrawColor(220, 38, 38);
-        doc.setLineWidth(0.6);
-        doc.roundedRect(6, y, 68, 12.5, 2, 2, 'FD');
-
-        doc.setFontSize(10);
-        doc.setFont('helvetica', 'bold');
-        doc.setTextColor(220, 38, 38);
-        doc.text('✕ UNPAID / DUE NOTICE ✕', 40, y + 5.5, { align: 'center' });
-
-        doc.setFontSize(6.5);
-        doc.setFont('helvetica', 'normal');
-        doc.setTextColor(30);
-        doc.text('Status: Pending Payment', 40, y + 9.5, { align: 'center' });
-    }
-
-    y += 16;
-
-    // --- Transaction & Reference Grid ---
-    const metadataRows = [
-        { label: "Transaction / ID:", value: String(vId) },
-        { label: "Invoice Number:", value: String(invoiceNo) },
-        { label: "Complaint #:", value: String(complaintNo) },
-        { label: "Customer Name:", value: String(customerName) },
-        { label: "Phone / Contact:", value: String(phone) },
-        { label: "Payment Method:", value: String(data.payment_method || (isPaid ? "Cash / Counter" : "Pending")) },
-    ];
-
-    metadataRows.forEach(row => {
-        doc.setFontSize(6.5);
-        doc.setFont("helvetica", "bold");
-        doc.setTextColor(100);
-        doc.text(row.label, 6, y);
-
-        doc.setFont("helvetica", "normal");
-        doc.setTextColor(20);
-        const valTrunc = doc.splitTextToSize(row.value, 42)[0] || '';
-        doc.text(valTrunc, 74, y, { align: "right" });
-        y += 4;
-    });
-
-    y += 1;
-    drawDashedLine(y);
-    y += 4;
-
-    // --- Line Items Table ---
-    doc.setFontSize(6.5);
-    doc.setFont("helvetica", "bold");
-    doc.setTextColor(50);
-    doc.text("ITEM / DESCRIPTION", 6, y);
-    doc.text("QTY", 48, y, { align: "center" });
-    doc.text("RATE", 60, y, { align: "right" });
-    doc.text("TOTAL", 74, y, { align: "right" });
-
-    y += 3;
-    doc.setDrawColor(210);
-    doc.setLineWidth(0.2);
-    doc.line(6, y, 74, y);
-    y += 3.5;
-
-    doc.setFontSize(6.5);
-    doc.setFont("helvetica", "normal");
-    doc.setTextColor(20);
-
-    items.forEach((item: any) => {
-        const desc = String(item.description || item.name || "Service / Part");
-        const rawQty = item.qty !== undefined ? item.qty : (item.quantity !== undefined ? item.quantity : 1);
-        const qty = isNaN(Number(rawQty)) || Number(rawQty) <= 0 ? 1 : Number(rawQty);
-        const rawPrice = item.unitPrice !== undefined ? item.unitPrice : (item.unit_price !== undefined ? item.unit_price : (item.rate !== undefined ? item.rate : 0));
-        const price = isNaN(Number(rawPrice)) ? 0 : Number(rawPrice);
-        const rawAmount = item.amount !== undefined ? item.amount : (item.total_price !== undefined ? item.total_price : (qty * price));
-        const amount = isNaN(Number(rawAmount)) ? (qty * price) : Number(rawAmount);
-
-        const descLines = doc.splitTextToSize(desc, 38);
-        doc.text(descLines[0] || 'Service', 6, y);
-        doc.text(String(qty), 48, y, { align: "center" });
-        doc.text(price.toLocaleString(), 60, y, { align: "right" });
-        doc.text(amount.toLocaleString(), 74, y, { align: "right" });
-        y += 4;
-    });
-
-    if (items.length === 0) {
-        doc.text("General Electrical Maintenance", 6, y);
-        doc.text("1", 48, y, { align: "center" });
-        doc.text(Number(data.total_amount || 0).toLocaleString(), 60, y, { align: "right" });
-        doc.text(Number(data.total_amount || 0).toLocaleString(), 74, y, { align: "right" });
-        y += 4;
-    }
-
-    y += 1;
-    drawDashedLine(y);
-    y += 4;
-
-    // --- Financial Summary ---
-    const subtotal = Number(data.subtotal) || Number(data.total_amount) || 0;
-    const taxRate = Number(data.sales_tax_rate) || 0;
-    const taxAmount = Number(data.tax_amount) || 0;
-    const discount = Number(data.discount_amount) || 0;
-    const advance = Number(data.advance_paid) || 0;
-    const total = Number(data.total_amount) || 0;
-
-    const renderTotalRow = (label: string, val: string, isBold: boolean = false, isGreen: boolean = false, customColor?: [number, number, number]) => {
-        doc.setFontSize(6.8);
-        doc.setFont("helvetica", isBold ? "bold" : "normal");
-        if (customColor) {
-            doc.setTextColor(customColor[0], customColor[1], customColor[2]);
-        } else if (isGreen) {
-            doc.setTextColor(22, 163, 74);
-        } else if (isBold) {
-            doc.setTextColor(20, 30, 60);
-        } else {
-            doc.setTextColor(90);
-        }
-        doc.text(label, 6, y);
-        doc.text(val, 74, y, { align: "right" });
-        y += 4;
-    };
-
-    renderTotalRow("Subtotal:", `Rs. ${subtotal.toLocaleString()}`);
-    if (taxAmount > 0) renderTotalRow(`Sales Tax (${taxRate}%):`, `Rs. ${taxAmount.toLocaleString()}`);
-    if (discount > 0) renderTotalRow("Discount:", `-Rs. ${discount.toLocaleString()}`);
-    if (advance > 0) renderTotalRow("Advance Paid:", `-Rs. ${advance.toLocaleString()}`);
-
-    doc.setDrawColor(30, 58, 138);
-    doc.setLineWidth(0.4);
-    doc.line(6, y, 74, y);
-    y += 3.5;
-
-    renderTotalRow("NET PAYABLE:", `Rs. ${total.toLocaleString()}`, true);
-
-    if (isPaid) {
-        renderTotalRow("AMOUNT RECEIVED:", `Rs. ${total.toLocaleString()}`, true, true);
-        renderTotalRow("REMAINING BALANCE:", "Rs. 0.00 (CLEARED)", true);
-    } else if (isPartial) {
-        const paidAmount = Number(data.advance_paid) || 0;
-        const remainingBalance = Math.max(0, total - paidAmount);
-
-        renderTotalRow("ITNA PAID (Amount Paid):", `Rs. ${paidAmount.toLocaleString()}`, true, false, [217, 119, 6]);
-        renderTotalRow("ITNI BAKI (Remaining Due):", `Rs. ${remainingBalance.toLocaleString()}`, true, false, [220, 38, 38]);
-
-        // Prominent highlighted banner box for remaining balance & promised date
-        y += 2;
-        doc.setFillColor(254, 243, 199);
-        doc.setDrawColor(217, 119, 6);
-        doc.setLineWidth(0.5);
-        doc.roundedRect(6, y, 68, 12.5, 1.5, 1.5, 'FD');
-
-        doc.setFontSize(6.8);
-        doc.setFont('helvetica', 'bold');
-        doc.setTextColor(180, 83, 9);
-        doc.text('BAKI ADAYGI DETAILS (BALANCE SCHEDULE)', 40, y + 4.2, { align: 'center' });
-
-        doc.setFontSize(6.5);
-        doc.setFont('helvetica', 'normal');
-        doc.setTextColor(20);
-        doc.text(`Baki Rs. ${remainingBalance.toLocaleString()} is tareekh ko paid ho ge:`, 40, y + 7.8, { align: 'center' });
-
-        doc.setFontSize(7.5);
-        doc.setFont('helvetica', 'bold');
-        doc.setTextColor(180, 83, 9);
-        doc.text(`${dueDateFormatted}`, 40, y + 11.2, { align: 'center' });
-
-        y += 15;
-    } else {
-        renderTotalRow("AMOUNT PAID:", `Rs. ${advance.toLocaleString()}`, true);
-        renderTotalRow("OUTSTANDING BALANCE:", `Rs. ${(total - advance).toLocaleString()}`, true);
-    }
-
-    y += 2;
-    drawDashedLine(y);
-    y += 5;
-
-    // --- QR Code ---
-    try {
-        const qrCodeUrl = await QRCode.toDataURL(qrData);
-        doc.addImage(qrCodeUrl, 'PNG', 29, y, 22, 22);
-        y += 24;
-
-        doc.setFontSize(6);
-        doc.setFont("helvetica", "bold");
-        doc.setTextColor(30, 58, 138);
-        doc.text("Scan QR to Verify Transaction Slip", 40, y, { align: "center" });
-
-        y += 3;
-        doc.setFont("helvetica", "normal");
-        doc.setTextColor(110);
-        doc.text(`ID: ${vId}`, 40, y, { align: "center" });
-        y += 4;
-    } catch (qrErr) {
-        console.error("QR Code Generation Error in Thermal Slip:", qrErr);
-    }
-
-    // --- Footer ---
-    doc.setFontSize(6.5);
-    doc.setFont("helvetica", "bold");
-    doc.setTextColor(60);
-    doc.text("Thank you for choosing ECS!", 40, y, { align: "center" });
-
-    y += 3.5;
-    doc.setFontSize(5.5);
-    doc.setFont("helvetica", "normal");
-    doc.setTextColor(120);
-    doc.text("Official bank-style electronic receipt slip", 40, y, { align: "center" });
+    // Render final content
+    renderSlipContent(doc);
 
     doc.save(`Thermal_Receipt_${invoiceNo || 'slip'}.pdf`);
 };
