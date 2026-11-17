@@ -214,12 +214,12 @@ export const generateEmployeeCard = async (data: any) => {
     // Right Edge Vertical Title on Red Stripe: "ELECTRIC COMPLAINT SOLUTIONS - ECS"
     // Runs from TOP TO BOTTOM (Uper se nicha), precisely centered both horizontally and vertically
     doc.setFont("helvetica", "bold");
-    doc.setFontSize(5.8);
+    doc.setFontSize(7.5);
     doc.setTextColor(255, 255, 255);
     const stripTitle = "ELECTRIC COMPLAINT SOLUTIONS - ECS";
     const stripTextW = doc.getTextWidth(stripTitle);
     const startY = (cardHeight - stripTextW) / 2; // Exact vertical center
-    const capHeightMm = 5.8 * (25.4 / 72) * 0.7; // ~1.43mm Helvetica bold cap height
+    const capHeightMm = 7.5 * (25.4 / 72) * 0.7; // Helvetica bold cap height (~1.85mm)
     const textX = stripeCenterX - (capHeightMm / 2); // Exact horizontal center between left and right strip edges
     doc.text(stripTitle, textX, startY, { angle: 270 });
 
