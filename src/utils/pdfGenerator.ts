@@ -794,60 +794,56 @@ export const generatePDF = async (type: 'welcome_note' | 'complaint_receipt' | '
         const vId = data.verification_id || data.id || "ECS-VERIFY-000";
         const qrData = `${window.location.origin}/verify?id=${vId}`;
 
-        let infoY = 42;
-        doc.setFontSize(8);
-        doc.setFont("helvetica", "bold");
-        doc.setTextColor(50);
-
-        doc.text(`Digital Verification ID:`, 15, infoY);
-        doc.setFont("helvetica", "normal");
-        doc.text(String(vId), 55, infoY);
-        infoY += 5;
-
-        if (data.branch_name) {
-            doc.setFont("helvetica", "bold");
-            doc.text(`Branch Name:`, 15, infoY);
-            doc.setFont("helvetica", "normal");
-            doc.text(String(data.branch_name), 55, infoY);
-            infoY += 5;
-
-            doc.setFont("helvetica", "bold");
-            doc.text(`Branch Code:`, 15, infoY);
-            doc.setFont("helvetica", "normal");
-            doc.text(String(data.branch_code || "N/A"), 55, infoY);
-            infoY += 5;
-
-            doc.setFont("helvetica", "bold");
-            doc.text(`Address:`, 15, infoY);
-            doc.setFont("helvetica", "normal");
-            doc.text(String(data.branch_address || "N/A"), 55, infoY, { maxWidth: 50 });
-        }
-
-        doc.setFontSize(32);
+        // Right Side Title
+        doc.setFontSize(30);
         doc.setFont("helvetica", "bold");
         doc.setTextColor("#1e3a8a");
         doc.text("INVOICE", pageWidth - 15, 25, { align: "right" });
 
-        let gridY = 45;
-        const gridValueX = pageWidth - 15;
-        const metadata = [
-            { label: "Date:", value: invoiceDate },
-            { label: "Invoice #:", value: data.invoice_number || "Draft" },
-            { label: "Complaint #:", value: data.complaints?.complaint_number || data.complaint_number || "Direct Billing" },
-            { label: "Due Date:", value: dueDate }
+        // Two perfectly parallel sections: Left (Verification & Branch) and Right (Invoice & Dates)
+        const leftFields = [
+            { label: "Digital Verification ID:", value: String(vId) },
+            { label: "Branch Name:", value: String(data.branch_name || data.branches?.name || "Main Branch") },
+            { label: "Branch Code:", value: String(data.branch_code || data.branches?.branch_code || "N/A") },
+            { label: "Address:", value: String(data.branch_address || data.branches?.address || data.branches?.city || "Islamabad") }
         ];
 
-        doc.setFontSize(9);
-        metadata.forEach(m => {
+        const rightFields = [
+            { label: "Date:", value: String(invoiceDate) },
+            { label: "Invoice #:", value: String(data.invoice_number || "Draft") },
+            { label: "Complaint #:", value: String(data.complaints?.complaint_number || data.complaint_number || "Direct Billing") },
+            { label: "Due Date:", value: String(dueDate) }
+        ];
+
+        const parallelY = 44;
+        const rowStep = 6.5;
+        const rightValueX = pageWidth - 15;
+
+        for (let i = 0; i < 4; i++) {
+            const currentY = parallelY + (i * rowStep);
+
+            // Left Side Row
+            doc.setFontSize(8);
             doc.setFont("helvetica", "bold");
             doc.setTextColor(100);
-            doc.text(m.label, pageWidth - 80, gridY);
-            doc.setTextColor(0);
-            doc.text(String(m.value), gridValueX, gridY, { align: "right" });
-            gridY += 6;
-        });
+            doc.text(leftFields[i].label, 15, currentY);
 
-        y = 85;
+            doc.setFont("helvetica", "normal");
+            doc.setTextColor(30);
+            const leftVal = doc.splitTextToSize(leftFields[i].value, 46)[0] || '';
+            doc.text(leftVal, 56, currentY);
+
+            // Right Side Row (Exact same Y level)
+            doc.setFont("helvetica", "bold");
+            doc.setTextColor(100);
+            doc.text(rightFields[i].label, pageWidth - 80, currentY);
+
+            doc.setFont("helvetica", "normal");
+            doc.setTextColor(0);
+            doc.text(rightFields[i].value, rightValueX, currentY, { align: "right" });
+        }
+
+        y = 75;
         doc.setDrawColor(30, 58, 138);
         doc.setLineWidth(0.5);
         doc.line(15, y, pageWidth - 15, y);
