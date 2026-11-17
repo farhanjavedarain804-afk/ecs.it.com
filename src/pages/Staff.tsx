@@ -402,7 +402,7 @@ const Staff = () => {
       {/* Expanded Multi-Section Employee Registration & Edit Modal */}
       {showForm && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4 animate-in fade-in duration-200">
-          <div className="w-full max-w-4xl rounded-3xl bg-card border border-border p-6 sm:p-8 shadow-2xl max-h-[92vh] overflow-y-auto">
+          <div className="w-full max-w-5xl rounded-3xl bg-card border border-border p-6 sm:p-8 shadow-2xl max-h-[92vh] overflow-y-auto overflow-x-hidden">
             <div className="flex items-center justify-between pb-4 border-b border-border">
               <div>
                 <h3 className="text-2xl font-bold font-display text-card-foreground">
@@ -420,8 +420,8 @@ const Staff = () => {
               </button>
             </div>
 
-            {/* Navigation Form Tabs */}
-            <div className="flex items-center gap-1.5 p-1 bg-muted/60 rounded-xl my-5 overflow-x-auto">
+            {/* Navigation Form Tabs - Fully Distributed Grid with Zero Scrollbar */}
+            <div className="grid grid-cols-2 sm:grid-cols-5 gap-2 p-1.5 bg-muted/60 rounded-2xl my-5">
               {[
                 { id: "personal", label: "1. Personal & Identity", icon: User },
                 { id: "job", label: "2. Job & Department", icon: Briefcase },
@@ -433,14 +433,14 @@ const Staff = () => {
                   key={tab.id}
                   type="button"
                   onClick={() => setActiveFormTab(tab.id as any)}
-                  className={`flex items-center gap-1.5 px-3.5 py-2 rounded-lg text-xs font-bold whitespace-nowrap transition-all ${
+                  className={`flex items-center justify-center gap-1.5 px-3 py-2.5 rounded-xl text-xs font-bold transition-all text-center ${
                     activeFormTab === tab.id
                       ? "bg-background text-foreground shadow-sm"
-                      : "text-muted-foreground hover:text-foreground"
+                      : "text-muted-foreground hover:text-foreground hover:bg-background/50"
                   }`}
                 >
-                  <tab.icon className="w-3.5 h-3.5" />
-                  {tab.label}
+                  <tab.icon className="w-3.5 h-3.5 shrink-0" />
+                  <span>{tab.label}</span>
                 </button>
               ))}
             </div>
