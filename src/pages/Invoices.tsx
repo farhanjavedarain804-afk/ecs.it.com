@@ -25,6 +25,13 @@ const Invoices = () => {
   const [editItemsForm, setEditItemsForm] = useState<{ items: any[], sales_tax_rate: string, shipping_handling: string, discount_amount: string, advance_paid: string }>({ items: [{ description: "", qty: 1, unitPrice: 0 }], sales_tax_rate: "0", shipping_handling: "0", discount_amount: "0", advance_paid: "0" });
   const [savingItems, setSavingItems] = useState(false);
   const [sendingEmailId, setSendingEmailId] = useState<string | null>(null);
+  const [partialModalInvoice, setPartialModalInvoice] = useState<any | null>(null);
+  const [partialForm, setPartialForm] = useState({
+    paidAmount: "",
+    dueDate: "",
+    notes: ""
+  });
+  const [savingPartial, setSavingPartial] = useState(false);
   const { user, hasRole, profile, session, isDeveloper } = useAuth();
   const { toast } = useToast();
 
@@ -409,6 +416,145 @@ const Invoices = () => {
       });
     } catch (err: any) {
       toast({ title: "PDF Error", description: err.message, variant: "destructive" });
+    }
+  };
+
+  const handleStatusSelectChange = (inv: any, newStatus: string) => {
+    if (newStatus === "partial") {
+      const currentAdvance = Number(inv.advance_paid) || 0;
+      const defaultPaid = currentAdvance > 0 ? String(currentAdvance) : "";
+      const defaultDate = inv.due_date
+        ? String(inv.due_date).split("T")[0]
+        : new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split("T")[0];
+
+      setPartialForm({
+        paidAmount: defaultPaid,
+        dueDate: defaultDate,
+        notes: inv.notes || ""
+      });
+      setPartialModalInvoice(inv);
+    } else {
+      updatePaymentStatus(inv.id, newStatus, inv.created_at, inv.payment_status);
+    }
+  };
+
+  const handleConfirmPartialPayment = async () => {
+    if (!partialModalInvoice) return;
+    const total = Number(partialModalInvoice.total_amount) || 0;
+    const paid = parseFloat(partialForm.paidAmount);
+
+    if (isNaN(paid) || paid <= 0) {
+      toast({
+        title: "Invalid Amount",
+        description: "Baraye meharbani ada ki gayi rakam (paid amount) darj karein.",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    if (paid >= total) {
+      toast({
+        title: "Full Amount Entered",
+        description: "Ada ki gayi rakam kul bill ke barabar ya zyada hai. Agar mukammal ada ho chuki hai to status 'Paid' muntakhib karein.",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    if (!partialForm.dueDate) {
+      toast({
+        title: "Due Date Required",
+        description: "Baki rakam kab deni hai (promised due date) muntakhib karein.",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    setSavingPartial(true);
+    const API_URL = import.meta.env.VITE_API_URL ?? '';
+
+    try {
+      const remainingBalance = Math.max(0, total - paid);
+      const noteAppend = `Partial Paid: Rs. ${paid.toLocaleString()}, Baki Rs. ${remainingBalance.toLocaleString()} Due Date: ${partialForm.dueDate}`;
+      const updatedNotes = partialForm.notes
+        ? (partialModalInvoice.notes && !partialModalInvoice.notes.includes(partialForm.notes)
+            ? `${partialModalInvoice.notes} | ${partialForm.notes}`
+            : partialForm.notes)
+        : partialModalInvoice.notes;
+
+      const res = await fetch(`${API_URL}/api/invoices/${partialModalInvoice.id}`, {
+        method: 'PATCH',
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('ecs_token')}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          payment_status: 'partial',
+          advance_paid: paid,
+          due_date: partialForm.dueDate,
+          notes: updatedNotes
+        })
+      });
+
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.error || "Server error while updating partial payment");
+      }
+
+      await logActivity({
+        userId: user?.id!,
+        userEmail: user?.email!,
+        activityType: "PAYMENT_STATUS_UPDATED",
+        branchId: profile?.branch_id || null,
+        metadata: {
+          invoiceId: partialModalInvoice.id,
+          newStatus: 'partial',
+          paidAmount: paid,
+          remainingBalance,
+          dueDate: partialForm.dueDate
+        }
+      });
+
+      toast({
+        title: "Partial Payment Saved",
+        description: `Rs. ${paid.toLocaleString()} recorded. Remaining Due: Rs. ${remainingBalance.toLocaleString()}`
+      });
+
+      // Automatically generate & download Partial Thermal Receipt
+      try {
+        const resInv = await fetch(`${API_URL}/api/invoices/${partialModalInvoice.id}`, {
+          headers: { 'Authorization': `Bearer ${localStorage.getItem('ecs_token')}` }
+        });
+        const fullInvoice = resInv.ok ? await resInv.json() : partialModalInvoice;
+
+        await generateThermalReceipt({
+          ...fullInvoice,
+          payment_status: 'partial',
+          advance_paid: paid,
+          due_date: partialForm.dueDate,
+          customer_name: fullInvoice.customers?.name || fullInvoice.customer_name,
+          phone: fullInvoice.customers?.phone || fullInvoice.phone,
+          address: fullInvoice.customers?.address || fullInvoice.address,
+          branch_name: fullInvoice.branches?.name || fullInvoice.branch_name,
+          branch_address: fullInvoice.branches?.address || fullInvoice.branch_address,
+          branch_code: fullInvoice.branches?.branch_code || fullInvoice.branch_code,
+          complaint_number: fullInvoice.complaints?.complaint_number || fullInvoice.complaint_number
+        });
+
+        toast({
+          title: "Thermal Receipt Downloaded",
+          description: "Yellow partial payment thermal slip generated successfully."
+        });
+      } catch (receiptErr) {
+        console.error("Error generating partial thermal receipt:", receiptErr);
+      }
+
+      setPartialModalInvoice(null);
+      fetchAll();
+    } catch (err: any) {
+      toast({ title: "Update Failed", description: err.message, variant: "destructive" });
+    } finally {
+      setSavingPartial(false);
     }
   };
 
@@ -919,15 +1065,27 @@ const Invoices = () => {
                     </td>
                     <td className="px-4 py-4 font-bold text-primary">Rs. {Number(inv.total_amount).toLocaleString()}</td>
                     <td className="px-4 py-4">
-                      <select
-                        value={inv.payment_status}
-                        onChange={(e) => updatePaymentStatus(inv.id, e.target.value, inv.created_at, inv.payment_status)}
-                        disabled={!isEditable(inv)}
-                        className={`px-2.5 py-1.5 rounded-lg text-xs font-bold capitalize border-0 cursor-pointer shadow-sm transition-all hover:scale-105 ${paymentColors[inv.payment_status] || "bg-muted"} `}>
-                        <option value="unpaid" className="bg-background text-foreground">Unpaid</option>
-                        <option value="partial" className="bg-background text-foreground">Partial</option>
-                        <option value="paid" className="bg-background text-foreground">Paid</option>
-                      </select>
+                      <div className="flex items-center gap-1.5">
+                        <select
+                          value={inv.payment_status}
+                          onChange={(e) => handleStatusSelectChange(inv, e.target.value)}
+                          disabled={!isEditable(inv)}
+                          className={`px-2.5 py-1.5 rounded-lg text-xs font-bold capitalize border-0 cursor-pointer shadow-sm transition-all hover:scale-105 ${paymentColors[inv.payment_status] || "bg-muted"} `}>
+                          <option value="unpaid" className="bg-background text-foreground">Unpaid</option>
+                          <option value="partial" className="bg-background text-foreground">Partial</option>
+                          <option value="paid" className="bg-background text-foreground">Paid</option>
+                        </select>
+                        {inv.payment_status === "partial" && (
+                          <button
+                            type="button"
+                            onClick={() => handleStatusSelectChange(inv, "partial")}
+                            className="p-1.5 rounded-md bg-amber-100 text-amber-800 hover:bg-amber-200 dark:bg-amber-950 dark:text-amber-300 dark:hover:bg-amber-900 transition-colors shadow-xs"
+                            title="Edit Partial Payment & Promised Due Date"
+                          >
+                            <Edit2 className="w-3.5 h-3.5" />
+                          </button>
+                        )}
+                      </div>
                     </td>
                     <td className={`px-4 py-4 font-semibold ${isOverdue ? "text-destructive flex items-center gap-1" : "text-muted-foreground"} `}>
                       {inv.due_date ? new Date(inv.due_date).toLocaleDateString() : "â€”"}
@@ -993,6 +1151,136 @@ const Invoices = () => {
         </div>
       )}
     </div>
+
+    {/* Partial Payment Modal (Kitni Paid Hui Hai & Baki Kab Deni Hai) */}
+    {partialModalInvoice && (
+      <div className="fixed inset-0 z-50 flex items-center justify-center bg-foreground/30 backdrop-blur-sm p-4 overflow-y-auto animate-in fade-in duration-200">
+        <div className="w-full max-w-lg rounded-3xl bg-card border border-amber-200/80 dark:border-amber-900/50 p-6 md:p-8 shadow-2xl animate-in zoom-in-95 duration-200">
+          <div className="flex items-start justify-between pb-4 border-b border-border">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-2xl bg-amber-100 dark:bg-amber-950/60 text-amber-600 dark:text-amber-400 flex items-center justify-center font-bold text-lg shadow-xs">
+                ₨
+              </div>
+              <div>
+                <h3 className="text-lg font-black text-foreground">Partial Payment Details</h3>
+                <p className="text-xs text-muted-foreground">
+                  Invoice <span className="font-bold text-primary font-mono">{partialModalInvoice.invoice_number}</span> • {partialModalInvoice.customers?.name || partialModalInvoice.customer_name || 'Customer'}
+                </p>
+              </div>
+            </div>
+            <button
+              onClick={() => setPartialModalInvoice(null)}
+              className="p-2 rounded-full hover:bg-muted text-muted-foreground transition-colors"
+            >
+              <X className="w-5 h-5" />
+            </button>
+          </div>
+
+          <div className="space-y-4 my-6">
+            {/* Total Bill Card */}
+            <div className="bg-gradient-to-r from-amber-50 to-orange-50 dark:from-amber-950/30 dark:to-orange-950/20 border border-amber-200 dark:border-amber-800/40 rounded-2xl p-4 flex items-center justify-between">
+              <div>
+                <span className="text-[11px] font-bold uppercase tracking-wider text-amber-800 dark:text-amber-300">Total Invoice Bill</span>
+                <p className="text-2xl font-black text-amber-900 dark:text-amber-100">
+                  Rs. {Number(partialModalInvoice.total_amount || 0).toLocaleString()}
+                </p>
+              </div>
+              <div className="text-right">
+                <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Status</span>
+                <p className="text-xs font-bold text-amber-600 uppercase bg-amber-100 dark:bg-amber-900/50 px-2.5 py-0.5 rounded-full mt-0.5">
+                  Partial Payment
+                </p>
+              </div>
+            </div>
+
+            {/* Paid Amount Input */}
+            <div>
+              <label className="block text-xs font-bold text-foreground mb-1.5">
+                Kitni Paid Hui Hai? (Amount Paid) <span className="text-destructive">*</span>
+              </label>
+              <div className="relative">
+                <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-sm font-bold text-muted-foreground">Rs.</span>
+                <input
+                  type="number"
+                  min="1"
+                  max={Number(partialModalInvoice.total_amount || 0) - 1}
+                  value={partialForm.paidAmount}
+                  onChange={(e) => setPartialForm({ ...partialForm, paidAmount: e.target.value })}
+                  placeholder="e.g. 2500"
+                  className="w-full pl-11 pr-4 py-2.5 rounded-xl border border-input bg-background text-foreground font-bold focus:ring-2 focus:ring-amber-500/30 focus:border-amber-500 transition-all text-sm outline-none"
+                  autoFocus
+                />
+              </div>
+            </div>
+
+            {/* Live Remaining Balance Calculation */}
+            {partialForm.paidAmount && !isNaN(Number(partialForm.paidAmount)) && Number(partialForm.paidAmount) > 0 && (
+              <div className="bg-muted/50 border border-border rounded-xl p-3 flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <AlertCircle className="w-4 h-4 text-amber-600" />
+                  <span className="text-xs font-bold text-foreground">Baki Rakam (Remaining Due):</span>
+                </div>
+                <span className="text-sm font-black text-destructive font-mono">
+                  Rs. {Math.max(0, Number(partialModalInvoice.total_amount || 0) - Number(partialForm.paidAmount)).toLocaleString()}
+                </span>
+              </div>
+            )}
+
+            {/* Baki Kab Deni Hai (Due Date) */}
+            <div>
+              <label className="block text-xs font-bold text-foreground mb-1.5">
+                Baki Kab Deni Hai? (Promised Due Date) <span className="text-destructive">*</span>
+              </label>
+              <div className="relative">
+                <Calendar className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                <input
+                  type="date"
+                  value={partialForm.dueDate}
+                  onChange={(e) => setPartialForm({ ...partialForm, dueDate: e.target.value })}
+                  className="w-full pl-11 pr-4 py-2.5 rounded-xl border border-input bg-background text-foreground font-medium focus:ring-2 focus:ring-amber-500/30 focus:border-amber-500 transition-all text-sm outline-none"
+                />
+              </div>
+              <p className="text-[11px] text-muted-foreground mt-1">
+                Is tareekh ko customer baki balance ada karega. Yeh tareekh thermal slip par print hogi.
+              </p>
+            </div>
+
+            {/* Optional Notes */}
+            <div>
+              <label className="block text-xs font-bold text-foreground mb-1.5">
+                Payment Remarks / Note (Optional)
+              </label>
+              <input
+                type="text"
+                value={partialForm.notes}
+                onChange={(e) => setPartialForm({ ...partialForm, notes: e.target.value })}
+                placeholder="e.g. Cash receive hua, baki agle hafte"
+                className="w-full px-4 py-2 rounded-xl border border-input bg-background text-foreground text-xs focus:ring-2 focus:ring-amber-500/30 focus:border-amber-500 transition-all outline-none"
+              />
+            </div>
+          </div>
+
+          <div className="flex items-center justify-end gap-3 pt-4 border-t border-border">
+            <button
+              type="button"
+              onClick={() => setPartialModalInvoice(null)}
+              className="px-4 py-2.5 rounded-xl border border-input hover:bg-muted text-foreground text-xs font-bold transition-colors"
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              disabled={savingPartial}
+              onClick={handleConfirmPartialPayment}
+              className="px-5 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-600 active:scale-95 text-white text-xs font-bold transition-all shadow-md flex items-center gap-2 disabled:opacity-50"
+            >
+              <Receipt className="w-4 h-4" />
+              {savingPartial ? "Saving & Generating..." : "Confirm & Download Thermal Slip"}
+            </button>
+          </div>
+        </div>
+      </div>
+    )}
 
     {/* Edit Invoice Items Modal */}
     {editingItemsInvoice && (

@@ -1068,6 +1068,10 @@ export const generatePDF = async (type: 'welcome_note' | 'complaint_receipt' | '
         if (discount > 0) drawTotalRow("Discount", `-${discount.toLocaleString()}`);
         if (advance > 0) drawTotalRow("Advance Paid", `-${advance.toLocaleString()}`);
         drawTotalRow("NET PAYABLE", total.toLocaleString(), true);
+        if (isPartial) {
+            const remBal = Math.max(0, total - advance);
+            drawTotalRow("REMAINING DUE", remBal.toLocaleString(), true);
+        }
 
         y = doc.internal.pageSize.getHeight() - 60;
         doc.setFontSize(9);
@@ -1720,7 +1724,9 @@ export const exportTableToPDF = async (title: string, headers: string[], rows: a
 
 export const generateThermalReceipt = async (data: any) => {
     const items = Array.isArray(data.items) ? data.items : [];
-    const receiptHeight = Math.max(175, 135 + (items.length * 6.5));
+    const isPaid = (data.payment_status || '').toLowerCase() === 'paid';
+    const isPartial = (data.payment_status || '').toLowerCase() === 'partial';
+    const receiptHeight = Math.max(185, 140 + (items.length * 6.5) + (isPartial ? 16 : 0));
     const doc = new jsPDF({
         orientation: 'portrait',
         unit: 'mm',
@@ -1730,6 +1736,48 @@ export const generateThermalReceipt = async (data: any) => {
     // Force crisp white background
     doc.setFillColor(255, 255, 255);
     doc.rect(0, 0, 80, receiptHeight, 'F');
+
+    // --- Background Watermark on Thermal Slip (Yellow for Partial, Green for Paid, Red for Unpaid) ---
+    doc.saveGraphicsState();
+    let hasGState = false;
+    try {
+        // @ts-ignore
+        if (typeof doc.GState === 'function' && typeof doc.setGState === 'function') {
+            // @ts-ignore
+            doc.setGState(new doc.GState({ opacity: 0.13 }));
+            hasGState = true;
+        }
+    } catch (e) {}
+
+    if (isPartial) {
+        doc.setFontSize(26);
+        doc.setFont('helvetica', 'bold');
+        if (hasGState) {
+            doc.setTextColor(217, 119, 6); // Amber #d97706
+        } else {
+            doc.setTextColor(254, 243, 199); // Soft Pastel Amber #fef3c7
+        }
+        doc.text('PARTIAL', 40, receiptHeight / 2, { align: 'center', angle: 35 });
+    } else if (isPaid) {
+        doc.setFontSize(30);
+        doc.setFont('helvetica', 'bold');
+        if (hasGState) {
+            doc.setTextColor(22, 163, 74); // Vibrant Green
+        } else {
+            doc.setTextColor(220, 252, 231); // Pastel Green
+        }
+        doc.text('PAID', 40, receiptHeight / 2, { align: 'center', angle: 35 });
+    } else {
+        doc.setFontSize(26);
+        doc.setFont('helvetica', 'bold');
+        if (hasGState) {
+            doc.setTextColor(220, 38, 38); // Red
+        } else {
+            doc.setTextColor(254, 226, 226); // Pastel Red
+        }
+        doc.text('UNPAID', 40, receiptHeight / 2, { align: 'center', angle: 35 });
+    }
+    doc.restoreGraphicsState();
 
     let settings = {
         company_name: 'Electric Complaint Solutions',
@@ -1764,7 +1812,6 @@ export const generateThermalReceipt = async (data: any) => {
     const complaintNo = data.complaint_number || data.complaints?.complaint_number || 'Direct Billing';
     const customerName = data.customer_name || data.customers?.name || 'Valued Customer';
     const phone = data.phone || data.customers?.phone || 'N/A';
-    const isPaid = (data.payment_status || '').toLowerCase() === 'paid';
 
     let y = 8;
 
@@ -1826,6 +1873,10 @@ export const generateThermalReceipt = async (data: any) => {
         day: '2-digit', month: 'short', year: 'numeric'
     }) + ' ' + new Date(paidAt).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
 
+    const dueDateFormatted = data.due_date ? new Date(data.due_date).toLocaleDateString('en-GB', {
+        day: '2-digit', month: 'short', year: 'numeric'
+    }) : 'As per agreement';
+
     if (isPaid) {
         doc.setFillColor(240, 253, 244);
         doc.setDrawColor(22, 163, 74);
@@ -1833,14 +1884,34 @@ export const generateThermalReceipt = async (data: any) => {
         doc.roundedRect(6, y, 68, 12.5, 2, 2, 'FD');
 
         doc.setFontSize(10);
-        doc.setFont("helvetica", "bold");
+        doc.setFont('helvetica', 'bold');
         doc.setTextColor(22, 163, 74);
-        doc.text("★ OFFICIAL PAYMENT RECEIVED ★", 40, y + 5.5, { align: "center" });
+        doc.text('★ OFFICIAL PAYMENT RECEIVED ★', 40, y + 5.5, { align: 'center' });
 
         doc.setFontSize(6.5);
-        doc.setFont("helvetica", "normal");
+        doc.setFont('helvetica', 'normal');
         doc.setTextColor(30);
-        doc.text(`Paid on: ${paidDateFormatted}`, 40, y + 9.5, { align: "center" });
+        doc.text(`Paid on: ${paidDateFormatted}`, 40, y + 9.5, { align: 'center' });
+    } else if (isPartial) {
+        doc.setFillColor(254, 243, 199);
+        doc.setDrawColor(217, 119, 6);
+        doc.setLineWidth(0.6);
+        doc.roundedRect(6, y, 68, 14, 2, 2, 'FD');
+
+        doc.setFontSize(9.5);
+        doc.setFont('helvetica', 'bold');
+        doc.setTextColor(180, 83, 9);
+        doc.text('★ PARTIAL PAYMENT RECEIVED ★', 40, y + 4.8, { align: 'center' });
+
+        doc.setFontSize(6.5);
+        doc.setFont('helvetica', 'normal');
+        doc.setTextColor(30);
+        doc.text(`Received on: ${paidDateFormatted}`, 40, y + 8.6, { align: 'center' });
+
+        doc.setFontSize(6.5);
+        doc.setFont('helvetica', 'bold');
+        doc.setTextColor(180, 83, 9);
+        doc.text(`Balance Due Date: ${dueDateFormatted}`, 40, y + 12.2, { align: 'center' });
     } else {
         doc.setFillColor(254, 242, 242);
         doc.setDrawColor(220, 38, 38);
@@ -1848,14 +1919,14 @@ export const generateThermalReceipt = async (data: any) => {
         doc.roundedRect(6, y, 68, 12.5, 2, 2, 'FD');
 
         doc.setFontSize(10);
-        doc.setFont("helvetica", "bold");
+        doc.setFont('helvetica', 'bold');
         doc.setTextColor(220, 38, 38);
-        doc.text("✕ UNPAID / DUE NOTICE ✕", 40, y + 5.5, { align: "center" });
+        doc.text('✕ UNPAID / DUE NOTICE ✕', 40, y + 5.5, { align: 'center' });
 
         doc.setFontSize(6.5);
-        doc.setFont("helvetica", "normal");
+        doc.setFont('helvetica', 'normal');
         doc.setTextColor(30);
-        doc.text("Status: Pending Payment", 40, y + 9.5, { align: "center" });
+        doc.text('Status: Pending Payment', 40, y + 9.5, { align: 'center' });
     }
 
     y += 16;
@@ -1943,10 +2014,12 @@ export const generateThermalReceipt = async (data: any) => {
     const advance = Number(data.advance_paid) || 0;
     const total = Number(data.total_amount) || 0;
 
-    const renderTotalRow = (label: string, val: string, isBold: boolean = false, isGreen: boolean = false) => {
+    const renderTotalRow = (label: string, val: string, isBold: boolean = false, isGreen: boolean = false, customColor?: [number, number, number]) => {
         doc.setFontSize(6.8);
         doc.setFont("helvetica", isBold ? "bold" : "normal");
-        if (isGreen) {
+        if (customColor) {
+            doc.setTextColor(customColor[0], customColor[1], customColor[2]);
+        } else if (isGreen) {
             doc.setTextColor(22, 163, 74);
         } else if (isBold) {
             doc.setTextColor(20, 30, 60);
@@ -1973,6 +2046,36 @@ export const generateThermalReceipt = async (data: any) => {
     if (isPaid) {
         renderTotalRow("AMOUNT RECEIVED:", `Rs. ${total.toLocaleString()}`, true, true);
         renderTotalRow("REMAINING BALANCE:", "Rs. 0.00 (CLEARED)", true);
+    } else if (isPartial) {
+        const paidAmount = Number(data.advance_paid) || 0;
+        const remainingBalance = Math.max(0, total - paidAmount);
+
+        renderTotalRow("ITNA PAID (Amount Paid):", `Rs. ${paidAmount.toLocaleString()}`, true, false, [217, 119, 6]);
+        renderTotalRow("ITNI BAKI (Remaining Due):", `Rs. ${remainingBalance.toLocaleString()}`, true, false, [220, 38, 38]);
+
+        // Prominent highlighted banner box for remaining balance & promised date
+        y += 2;
+        doc.setFillColor(254, 243, 199);
+        doc.setDrawColor(217, 119, 6);
+        doc.setLineWidth(0.5);
+        doc.roundedRect(6, y, 68, 12.5, 1.5, 1.5, 'FD');
+
+        doc.setFontSize(6.8);
+        doc.setFont('helvetica', 'bold');
+        doc.setTextColor(180, 83, 9);
+        doc.text('BAKI ADAYGI DETAILS (BALANCE SCHEDULE)', 40, y + 4.2, { align: 'center' });
+
+        doc.setFontSize(6.5);
+        doc.setFont('helvetica', 'normal');
+        doc.setTextColor(20);
+        doc.text(`Baki Rs. ${remainingBalance.toLocaleString()} is tareekh ko paid ho ge:`, 40, y + 7.8, { align: 'center' });
+
+        doc.setFontSize(7.5);
+        doc.setFont('helvetica', 'bold');
+        doc.setTextColor(180, 83, 9);
+        doc.text(`${dueDateFormatted}`, 40, y + 11.2, { align: 'center' });
+
+        y += 15;
     } else {
         renderTotalRow("AMOUNT PAID:", `Rs. ${advance.toLocaleString()}`, true);
         renderTotalRow("OUTSTANDING BALANCE:", `Rs. ${(total - advance).toLocaleString()}`, true);
