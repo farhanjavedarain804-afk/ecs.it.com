@@ -68,6 +68,10 @@ router.get('/verify/:id', async (req, res) => {
         const rawInput = (id || '').trim();
         const input = rawInput.toUpperCase();
         const cleanInput = input.replace(/^#+/, '').trim();
+        let seqNum = null;
+        if (/^ECS\d{7}$/i.test(cleanInput)) {
+            seqNum = parseInt(cleanInput.slice(-3), 10) || null;
+        }
 
         // 1. Check Invoices & Thermal Receipts
         const [invoices] = await pool.query(`
@@ -81,7 +85,9 @@ router.get('/verify/:id', async (req, res) => {
             LEFT JOIN customers c ON i.customer_id = c.id
             WHERE i.verification_id = ? OR i.invoice_number = ? OR i.id = ? 
                OR i.invoice_number = ? OR UPPER(i.invoice_number) = ? OR UPPER(i.invoice_number) = ?
-        `, [input, input, input, cleanInput, input, cleanInput]);
+               OR (i.id = ? AND ? IS NOT NULL)
+               OR (i.invoice_number LIKE ? AND ? IS NOT NULL)
+        `, [input, input, input, cleanInput, input, cleanInput, seqNum, seqNum, `%${cleanInput.slice(-3)}`, seqNum]);
 
         if (invoices.length > 0) {
             const row = invoices[0];

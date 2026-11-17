@@ -1752,8 +1752,22 @@ export const generateThermalReceipt = async (data: any) => {
         console.error("Error fetching settings for thermal receipt:", err);
     }
 
-    const vId = data.verification_id || data.id || "ECS-TXN-000";
-    const qrData = `${window.location.origin}/verify?id=${vId}`;
+    // Format strictly 10-character transaction ID:
+    // "ECS" (3) + Month (2, MM) + Year (2, YY) + Transaction sequence (3 digits) = Exactly 10 characters
+    // Example: ECS1126042
+    const d = new Date(data.paid_at || data.created_at || Date.now());
+    const mm = String(d.getMonth() + 1).padStart(2, '0');
+    const yy = String(d.getFullYear()).slice(-2);
+    const rawDigits = String(data.verification_id || data.invoice_number || data.id || '').replace(/\D/g, '');
+    let seq = '001';
+    if (rawDigits.length >= 3) {
+        seq = rawDigits.slice(-3);
+    } else if (rawDigits.length > 0) {
+        seq = rawDigits.padStart(3, '0');
+    }
+    const txnId = `ECS${mm}${yy}${seq}`.toUpperCase().slice(0, 10);
+    const vId = txnId;
+    const qrData = `${window.location.origin}/verify?id=${txnId}`;
     const branchName = data.branch_name || data.branches?.name || 'Main Branch';
     const branchCode = data.branch_code || data.branches?.branch_code || '';
     const invoiceNo = data.invoice_number || 'N/A';
@@ -1776,8 +1790,11 @@ export const generateThermalReceipt = async (data: any) => {
         // Mini logo or brand mark
         if (logoBase64) {
             try {
-                doc.addImage(logoBase64, 'PNG', 32, y, 16, 12);
-                y += 14;
+                // Original logo aspect ratio (2.1 : 1)
+                const logoW = 19;
+                const logoH = 9;
+                doc.addImage(logoBase64, 'PNG', 40 - (logoW / 2), y, logoW, logoH);
+                y += logoH + 5; // Clean, generous space between logo and company name
             } catch {
                 // fallback
             }
@@ -1841,55 +1858,59 @@ export const generateThermalReceipt = async (data: any) => {
             doc.setFillColor(240, 253, 244);
             doc.setDrawColor(22, 163, 74);
             doc.setLineWidth(0.6);
-            doc.roundedRect(6, y, 68, 12.5, 2, 2, 'FD');
+            doc.roundedRect(6, y, 68, 13, 2, 2, 'FD');
 
-            doc.setFontSize(10);
+            doc.setFontSize(9.5);
             doc.setFont('helvetica', 'bold');
             doc.setTextColor(22, 163, 74);
-            doc.text('★ OFFICIAL PAYMENT RECEIVED ★', 40, y + 5.5, { align: 'center' });
+            doc.text('OFFICIAL PAYMENT RECORD', 40, y + 5.2, { align: 'center' });
 
             doc.setFontSize(6.5);
             doc.setFont('helvetica', 'normal');
             doc.setTextColor(30);
             doc.text(`Paid on: ${paidDateFormatted}`, 40, y + 9.5, { align: 'center' });
+
+            y += 13 + 5; // Generous space below box before next text
         } else if (isPartial) {
             doc.setFillColor(254, 243, 199);
             doc.setDrawColor(217, 119, 6);
             doc.setLineWidth(0.6);
-            doc.roundedRect(6, y, 68, 14, 2, 2, 'FD');
+            doc.roundedRect(6, y, 68, 16, 2, 2, 'FD');
 
-            doc.setFontSize(9.5);
+            doc.setFontSize(9.0);
             doc.setFont('helvetica', 'bold');
             doc.setTextColor(180, 83, 9);
-            doc.text('★ PARTIAL PAYMENT RECEIVED ★', 40, y + 4.8, { align: 'center' });
+            doc.text('PARTIAL PAYMENT RECORD', 40, y + 5.0, { align: 'center' });
 
             doc.setFontSize(6.5);
             doc.setFont('helvetica', 'normal');
             doc.setTextColor(30);
-            doc.text(`Received on: ${paidDateFormatted}`, 40, y + 8.6, { align: 'center' });
+            doc.text(`Received on: ${paidDateFormatted}`, 40, y + 9.0, { align: 'center' });
 
             doc.setFontSize(6.5);
             doc.setFont('helvetica', 'bold');
             doc.setTextColor(180, 83, 9);
-            doc.text(`Promised Balance Due: ${dueDateFormatted}`, 40, y + 12.2, { align: 'center' });
+            doc.text(`Promised Balance Due: ${dueDateFormatted}`, 40, y + 13.0, { align: 'center' });
+
+            y += 16 + 5; // Generous space below box before next text
         } else {
             doc.setFillColor(254, 242, 242);
             doc.setDrawColor(220, 38, 38);
             doc.setLineWidth(0.6);
-            doc.roundedRect(6, y, 68, 12.5, 2, 2, 'FD');
+            doc.roundedRect(6, y, 68, 13, 2, 2, 'FD');
 
-            doc.setFontSize(10);
+            doc.setFontSize(9.5);
             doc.setFont('helvetica', 'bold');
             doc.setTextColor(220, 38, 38);
-            doc.text('✕ UNPAID / DUE NOTICE ✕', 40, y + 5.5, { align: 'center' });
+            doc.text('UNPAID / PAYMENT DUE NOTICE', 40, y + 5.2, { align: 'center' });
 
             doc.setFontSize(6.5);
             doc.setFont('helvetica', 'normal');
             doc.setTextColor(30);
             doc.text('Status: Pending Payment', 40, y + 9.5, { align: 'center' });
-        }
 
-        y += 16;
+            y += 13 + 5; // Generous space below box before next text
+        }
 
         // Transaction & Reference Grid
         const metadataRows = [
