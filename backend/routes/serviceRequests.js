@@ -57,6 +57,11 @@ router.post('/public', async (req, res) => {
         }
         if (!colNames.includes('status')) {
             await pool.query("ALTER TABLE service_requests ADD COLUMN status VARCHAR(50) DEFAULT 'pending'");
+        } else {
+            try {
+                // Ensure status is VARCHAR(50) so valid status values are never truncated to empty strings
+                await pool.query("ALTER TABLE service_requests MODIFY COLUMN status VARCHAR(50) DEFAULT 'pending'");
+            } catch (e) {}
         }
         if (!colNames.includes('converted_complaint_id')) {
             await pool.query("ALTER TABLE service_requests ADD COLUMN converted_complaint_id VARCHAR(36) DEFAULT NULL");
@@ -117,8 +122,19 @@ router.post('/public', async (req, res) => {
 // @access  Private
 router.get('/', auth(), async (req, res) => {
     try {
+        const { show_converted, status } = req.query;
         let query = 'SELECT sr.*, b.name as branch_name, b.city as branch_city FROM service_requests sr LEFT JOIN branches b ON sr.branch_id = b.id WHERE 1=1';
         let params = [];
+
+        // Converted requests are moved/hidden from the active requests section by default ("wo ider na show ho")
+        if (show_converted === 'true') {
+            query += " AND sr.status = 'converted_to_complaint'";
+        } else if (status) {
+            query += " AND sr.status = ?";
+            params.push(status);
+        } else {
+            query += " AND (sr.status != 'converted_to_complaint' OR sr.status IS NULL)";
+        }
 
         // Determine column for branch filtering
         const [columns] = await pool.query("SHOW COLUMNS FROM service_requests");
@@ -136,6 +152,11 @@ router.get('/', auth(), async (req, res) => {
         }
         if (!colNames.includes('status')) {
             await pool.query("ALTER TABLE service_requests ADD COLUMN status VARCHAR(50) DEFAULT 'pending'");
+        } else {
+            try {
+                // Ensure status is VARCHAR(50) so valid status values are never truncated to empty strings
+                await pool.query("ALTER TABLE service_requests MODIFY COLUMN status VARCHAR(50) DEFAULT 'pending'");
+            } catch (e) {}
         }
         if (!colNames.includes('converted_complaint_id')) {
             await pool.query("ALTER TABLE service_requests ADD COLUMN converted_complaint_id VARCHAR(36) DEFAULT NULL");
@@ -192,6 +213,11 @@ router.put('/:id', auth(), async (req, res) => {
         if (!status) {
             return res.status(400).json({ error: 'Status is required' });
         }
+
+        // Ensure status column is VARCHAR(50) so valid status values are never blanked
+        try {
+            await pool.query("ALTER TABLE service_requests MODIFY COLUMN status VARCHAR(50) DEFAULT 'pending'");
+        } catch (e) {}
 
         // Check if already locked as converted
         const [existing] = await pool.query('SELECT status, converted_complaint_number FROM service_requests WHERE id = ?', [req.params.id]);

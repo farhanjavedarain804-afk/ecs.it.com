@@ -7,7 +7,9 @@ const pool = require('../config/db');
 router.get('/verify/:id', async (req, res) => {
     try {
         const { id } = req.params;
-        const input = id.trim().toUpperCase();
+        const rawInput = (id || '').trim();
+        const input = rawInput.toUpperCase();
+        const cleanInput = input.replace(/^#+/, '').trim();
 
         // 1. Check Invoices
         const [invoices] = await pool.query(`
@@ -48,8 +50,8 @@ router.get('/verify/:id', async (req, res) => {
             FROM complaints c
             LEFT JOIN branches b ON c.branch_id = b.id
             LEFT JOIN customers cust ON c.customer_id = cust.id
-            WHERE c.verification_id = ? OR c.complaint_number = ? OR c.id = ?
-        `, [input, input, input]);
+            WHERE c.verification_id = ? OR c.complaint_number = ? OR c.id = ? OR c.complaint_number = ? OR UPPER(c.complaint_number) = ? OR UPPER(c.complaint_number) = ?
+        `, [input, input, input, cleanInput, input, cleanInput]);
 
 
         if (complaints.length > 0) {
@@ -158,16 +160,16 @@ router.get('/verify/:id', async (req, res) => {
                 `SELECT sr.*, b.name as branch_name, b.city as branch_city
                  FROM service_requests sr
                  LEFT JOIN branches b ON sr.branch_id = b.id
-                 WHERE sr.id = ?`,
-                [input]
+                 WHERE UPPER(sr.id) = ? OR sr.id = ?`,
+                [input, input]
             );
             if (sr.length > 0) {
                 const row = sr[0];
                 const compNum = row.converted_complaint_number || null;
                 const isConverted = row.status === 'converted_to_complaint' || Boolean(compNum);
                 const message = isConverted 
-                    ? `Aap ki service request official complaint (${compNum || 'In Process'}) mein convert ho chuki hai. Please complaint number se track karein.` 
-                    : null;
+                    ? `Your service request has been successfully registered and converted into an official Complaint. Your Complaint Number is #${compNum || 'Assigned'}. Please track your real-time service status using your Complaint Number.` 
+                    : `Your service request has been received and is currently ${row.status || 'pending'}. Our technical support team is processing your request.`;
 
                 return res.json({
                     type: 'service_request',
@@ -175,7 +177,7 @@ router.get('/verify/:id', async (req, res) => {
                     data: {
                         number: row.id,
                         customer: row.name,
-                        status: row.status,
+                        status: row.status || 'pending',
                         branch: row.branch_name || row.city_branch || row.branch || row.city || '',
                         service: row.service_required || row.service || '',
                         phone: row.phone,
@@ -189,7 +191,7 @@ router.get('/verify/:id', async (req, res) => {
                 });
             }
         } catch (e) {
-            // Ignore if table doesn't exist
+            console.error('[Public Verify Service Request Error]:', e.message);
         }
 
         res.status(404).json({ error: 'No record found with this ID' });

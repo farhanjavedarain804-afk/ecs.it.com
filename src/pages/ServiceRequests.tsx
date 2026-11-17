@@ -13,6 +13,8 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } f
 const statusColors: Record<string, string> = {
   pending: "bg-amber-100 text-amber-700",
   contacted: "bg-blue-100 text-blue-700",
+  in_progress: "bg-purple-100 text-purple-700",
+  resolved: "bg-emerald-100 text-emerald-700",
   converted_to_complaint: "bg-emerald-100 text-emerald-700",
   rejected: "bg-destructive/10 text-destructive",
 };
@@ -68,9 +70,15 @@ const ServiceRequests = () => {
     }
   };
 
-  const fetchRequests = async () => {
+  const [activeTab, setActiveTab] = useState<"active" | "converted">("active");
+
+  const fetchRequests = async (tab: "active" | "converted" = activeTab) => {
     try {
-      const res = await fetch(`${API_URL}/api/service_requests`, {
+      setLoading(true);
+      const url = tab === "converted"
+        ? `${API_URL}/api/service_requests?show_converted=true`
+        : `${API_URL}/api/service_requests`;
+      const res = await fetch(url, {
         headers: { Authorization: `Bearer ${localStorage.getItem("ecs_token")}` },
       });
       if (!res.ok) throw new Error("Failed to fetch");
@@ -83,8 +91,13 @@ const ServiceRequests = () => {
     }
   };
 
+  const handleTabChange = (tab: "active" | "converted") => {
+    setActiveTab(tab);
+    fetchRequests(tab);
+  };
+
   useEffect(() => {
-    fetchRequests();
+    fetchRequests("active");
     fetchAuxData();
   }, []);
 
@@ -299,24 +312,32 @@ const ServiceRequests = () => {
       }
 
       const compData = await compRes.json();
+      const compId = compData.id || compData.complaint?.id;
+      const compNum = compData.complaint_number || compData.complaint?.complaint_number;
 
-      // 3. Update Service Request status to converted_to_complaint
+      // 3. Update Service Request status to converted_to_complaint and persist complaint link
       await fetch(`${API_URL}/api/service_requests/${convertingReq.id}`, {
         method: "PUT",
         headers,
-        body: JSON.stringify({ status: "converted_to_complaint" }),
+        body: JSON.stringify({ 
+          status: "converted_to_complaint",
+          converted_complaint_id: compId,
+          converted_complaint_number: compNum
+        }),
       });
 
-      // Update local state immediately
-      setRequests(prev => prev.map(r => r.id === convertingReq.id ? { ...r, status: "converted_to_complaint" } : r));
+      // Instantly remove from active requests table so it moves out cleanly with zero loss
+      setRequests(prev => prev.filter(r => r.id !== convertingReq.id));
 
       toast({
-        title: "Complaint Registered & Status Updated!",
-        description: `Complaint #${compData.complaint_number || 'N/A'} registered successfully.`,
+        title: "Complaint Registered & Request Moved!",
+        description: `Service request converted and moved to Complaint #${compNum || 'Assigned'}.`,
       });
 
       setConvertingReq(null);
-      fetchRequests();
+      if (activeTab === "converted") {
+        fetchRequests("converted");
+      }
     } catch (err: any) {
       toast({ title: "Conversion Error", description: err.message, variant: "destructive" });
     } finally {
@@ -355,6 +376,34 @@ const ServiceRequests = () => {
         <div>
           <h1 className="text-2xl font-bold tracking-tight">Service Requests</h1>
           <p className="text-sm text-muted-foreground">Manage service inquiries from the landing page</p>
+        </div>
+
+        {/* Tab switch between Active Inquiries and Converted Archive */}
+        <div className="flex items-center gap-1.5 bg-muted p-1 rounded-xl border border-border shadow-sm">
+          <button
+            type="button"
+            onClick={() => handleTabChange("active")}
+            className={`px-4 py-2 rounded-lg text-xs font-bold transition-all flex items-center gap-2 ${
+              activeTab === "active"
+                ? "bg-background text-foreground shadow-sm"
+                : "text-muted-foreground hover:text-foreground"
+            }`}
+          >
+            <Clock className="w-3.5 h-3.5 text-sky-600" />
+            Active Inquiries
+          </button>
+          <button
+            type="button"
+            onClick={() => handleTabChange("converted")}
+            className={`px-4 py-2 rounded-lg text-xs font-bold transition-all flex items-center gap-2 ${
+              activeTab === "converted"
+                ? "bg-background text-foreground shadow-sm"
+                : "text-muted-foreground hover:text-foreground"
+            }`}
+          >
+            <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
+            Converted to Complaints
+          </button>
         </div>
       </div>
 
@@ -422,8 +471,8 @@ const ServiceRequests = () => {
                     </td>
                     <td className="px-4 py-3">{req.city_branch}</td>
                     <td className="px-4 py-3">
-                      <span className={`px-2.5 py-1 rounded-full text-xs font-semibold capitalize ${statusColors[req.status] || "bg-muted text-muted-foreground"}`}>
-                        {req.status?.replace(/_/g, " ")}
+                      <span className={`px-2.5 py-1 rounded-full text-xs font-semibold capitalize ${statusColors[req.status || 'pending'] || "bg-muted text-muted-foreground"}`}>
+                        {(req.status || 'pending').replace(/_/g, " ")}
                       </span>
                     </td>
                     <td className="px-4 py-3 text-right">
@@ -433,23 +482,36 @@ const ServiceRequests = () => {
                         </Button>
 
                         {req.status === "converted_to_complaint" ? (
-                          <div 
-                            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800 text-xs font-bold shadow-sm"
-                            title="Request is converted and permanently locked"
-                          >
-                            <Lock className="w-3.5 h-3.5 text-emerald-600" />
-                            <span>Converted {req.converted_complaint_number ? `#${req.converted_complaint_number}` : ''}</span>
+                          <div className="flex items-center gap-2">
+                            <div 
+                              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800 text-xs font-bold shadow-sm"
+                              title="Request is converted and permanently locked"
+                            >
+                              <Lock className="w-3.5 h-3.5 text-emerald-600" />
+                              <span>Complaint #{req.converted_complaint_number || 'Assigned'}</span>
+                            </div>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => window.open(`/verify?id=${req.converted_complaint_number || req.id}`, '_blank')}
+                              className="h-8 gap-1 text-xs hover:bg-emerald-50 text-emerald-700 border-emerald-200"
+                              title="Track complaint"
+                            >
+                              <Search className="w-3.5 h-3.5" /> Track
+                            </Button>
                           </div>
                         ) : (
                           <>
                             <select
                               className="text-xs bg-background border border-border rounded-md px-2 py-1.5 focus:outline-none focus:ring-1 focus:ring-primary cursor-pointer font-medium"
-                              value={req.status}
+                              value={req.status || "pending"}
                               onChange={(e) => handleStatusChange(req, e.target.value)}
                             >
                               <option value="pending">Pending</option>
                               <option value="contacted">Contacted</option>
-                              <option value="converted_to_complaint">Converted</option>
+                              <option value="in_progress">In Progress</option>
+                              <option value="resolved">Resolved</option>
+                              <option value="converted_to_complaint">Convert to Complaint</option>
                               <option value="rejected">Rejected</option>
                             </select>
 
