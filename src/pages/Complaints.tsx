@@ -6,13 +6,20 @@ import { Plus, Search, Edit2, Clock, CheckCircle2, AlertTriangle, XCircle, FileD
 import { generatePDF, exportTableToPDF } from "@/utils/pdfGenerator";
 import { logActivity } from "@/utils/logger";
 
+const STANDARD_STATUSES = ["registered", "assigned", "in_progress", "solved", "invoice_generated", "dismissed"];
+
 const statusColors: Record<string, string> = {
   registered: "bg-muted text-muted-foreground",
-  assigned: "bg-primary/10 text-primary",
-  in_progress: "bg-accent/10 text-accent-foreground",
+  assigned: "bg-blue-100 text-blue-700",
+  in_progress: "bg-amber-100 text-amber-800",
   solved: "bg-emerald-100 text-emerald-700",
-  invoice_generated: "bg-blue-100 text-blue-700",
+  invoice_generated: "bg-sky-100 text-sky-700",
   dismissed: "bg-destructive/10 text-destructive",
+};
+
+const getStatusBadgeClass = (status: string) => {
+  if (statusColors[status]) return statusColors[status];
+  return "bg-purple-100 text-purple-800 border border-purple-200 dark:bg-purple-950/40 dark:text-purple-300";
 };
 
 const priorityColors: Record<string, string> = {
@@ -30,12 +37,51 @@ const Complaints = () => {
   const [search, setSearch] = useState("");
   const [filterMonth, setFilterMonth] = useState("last_2_months");
   const [filterStatus, setFilterStatus] = useState("");
-  const [activeSection, setActiveSection] = useState<"pending" | "overdue" | "critical" | "solved" | "dismissed">("pending");
+  const [activeSection, setActiveSection] = useState<"pending" | "overdue" | "critical" | "custom" | "solved" | "dismissed">("pending");
+  const [customStatuses, setCustomStatuses] = useState<string[]>(() => {
+    try {
+      const saved = localStorage.getItem("ecs_custom_complaint_statuses");
+      return saved ? JSON.parse(saved) : [];
+    } catch {
+      return [];
+    }
+  });
+
+  const [customStatusModal, setCustomStatusModal] = useState<{
+    open: boolean;
+    complaint: any | null;
+    statusName: string;
+  }>({
+    open: false,
+    complaint: null,
+    statusName: ""
+  });
   const [customers, setCustomers] = useState<any[]>([]);
   const [branches, setBranches] = useState<any[]>([]);
   const [technicians, setTechnicians] = useState<any[]>([]);
   const [editingId, setEditingId] = useState<string | null>(null);
   const { toast } = useToast();
+
+  const allCustomStatuses = Array.from(new Set([
+    ...customStatuses,
+    ...complaints.map(c => c.status).filter(s => s && !STANDARD_STATUSES.includes(s))
+  ]));
+
+  useEffect(() => {
+    if (complaints.length > 0) {
+      const fromDB = complaints.map(c => c.status).filter(s => s && !STANDARD_STATUSES.includes(s));
+      if (fromDB.length > 0) {
+        setCustomStatuses(prev => {
+          const merged = Array.from(new Set([...prev, ...fromDB]));
+          if (merged.length !== prev.length) {
+            localStorage.setItem("ecs_custom_complaint_statuses", JSON.stringify(merged));
+            return merged;
+          }
+          return prev;
+        });
+      }
+    }
+  }, [complaints]);
 
   // Customer type: new or old
   const [customerType, setCustomerType] = useState<"old" | "new">("old");
@@ -555,6 +601,7 @@ const Complaints = () => {
 
     if (activeSection === "solved") return ["solved", "invoice_generated"].includes(c.status);
     if (activeSection === "dismissed") return c.status === "dismissed";
+    if (activeSection === "custom") return !STANDARD_STATUSES.includes(c.status);
 
     const created = new Date(c.created_at);
     const diffHours = (now.getTime() - created.getTime()) / (1000 * 60 * 60);
@@ -644,15 +691,58 @@ const Complaints = () => {
           { key: "pending", label: "Pending", icon: Clock },
           { key: "overdue", label: "Overdue", icon: Clock, color: "text-orange-600" },
           { key: "critical", label: "Critical", icon: AlertTriangle, color: "text-red-600" },
+          { key: "custom", label: "Custom Status", icon: Sparkles, color: "text-purple-600", count: complaints.filter(c => !STANDARD_STATUSES.includes(c.status)).length },
           { key: "solved", label: "Solved", icon: CheckCircle2 },
           { key: "dismissed", label: "Dismissed", icon: XCircle },
         ].map((tab) => (
           <button key={tab.key} onClick={() => setActiveSection(tab.key as any)}
-            className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold transition-all ${activeSection === tab.key ? "bg-background text-foreground shadow-md" : "text-muted-foreground hover:text-foreground"} ${(tab.key === 'critical' || tab.key === 'overdue') && activeSection === tab.key ? tab.color : ''}`}>
-            <tab.icon className={`w-4 h-4 ${tab.key === 'critical' || tab.key === 'overdue' ? tab.color : ''}`} /> {tab.label}
+            className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold transition-all ${activeSection === tab.key ? "bg-background text-foreground shadow-md" : "text-muted-foreground hover:text-foreground"} ${(tab.key === 'critical' || tab.key === 'overdue' || tab.key === 'custom') && activeSection === tab.key ? tab.color : ''}`}>
+            <tab.icon className={`w-4 h-4 ${(tab.key === 'critical' || tab.key === 'overdue' || tab.key === 'custom') ? tab.color : ''}`} /> 
+            {tab.label}
+            {tab.count !== undefined && tab.count > 0 && (
+              <span className="px-1.5 py-0.5 text-[10px] font-black rounded-full bg-purple-100 text-purple-800">
+                {tab.count}
+              </span>
+            )}
           </button>
         ))}
       </div>
+
+      {/* Custom Status Toolbar / Dedicated Section */}
+      {activeSection === "custom" && (
+        <div className="p-4 rounded-2xl bg-gradient-to-r from-purple-500/10 via-indigo-500/5 to-transparent border border-purple-200 dark:border-purple-900/50 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 shadow-sm">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-purple-100 dark:bg-purple-900/40 text-purple-700 dark:text-purple-300 flex items-center justify-center shrink-0">
+              <Sparkles className="w-5 h-5" />
+            </div>
+            <div>
+              <h3 className="text-sm font-bold text-foreground">Custom Status Workflow Section</h3>
+              <p className="text-xs text-muted-foreground">Manage and filter complaints tagged with custom operational statuses.</p>
+            </div>
+          </div>
+          <div className="flex items-center gap-2 flex-wrap">
+            {allCustomStatuses.map(st => (
+              <button
+                key={st}
+                onClick={() => setFilterStatus(filterStatus === st ? "" : st)}
+                className={`px-3 py-1 text-xs rounded-lg font-bold border transition-all ${
+                  filterStatus === st 
+                    ? "bg-purple-600 text-white border-purple-600 shadow-sm" 
+                    : "bg-background text-purple-700 border-purple-200 hover:bg-purple-50"
+                }`}
+              >
+                {st} ({complaints.filter(c => c.status === st).length})
+              </button>
+            ))}
+            <button
+              onClick={() => setCustomStatusModal({ open: true, complaint: null, statusName: "" })}
+              className="px-3 py-1.5 text-xs rounded-lg font-bold bg-purple-600 hover:bg-purple-700 text-white flex items-center gap-1 shadow-sm transition-all"
+            >
+              <Plus className="w-3.5 h-3.5" /> New Status Label
+            </button>
+          </div>
+        </div>
+      )}
 
       <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
         <div className="lg:col-span-3 space-y-4">
@@ -663,12 +753,21 @@ const Complaints = () => {
             </div>
             <select value={filterStatus} onChange={(e) => setFilterStatus(e.target.value)} className="rounded-xl border border-input bg-background px-4 py-2.5 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-ring min-w-[150px]">
               <option value="">All Status</option>
-              <option value="registered">Registered</option>
-              <option value="assigned">Assigned</option>
-              <option value="in_progress">In Progress</option>
-              <option value="completed">Completed</option>
-              <option value="solved">Solved</option>
-              <option value="dismissed">Dismissed</option>
+              <optgroup label="Standard Status">
+                <option value="registered">Registered</option>
+                <option value="assigned">Assigned</option>
+                <option value="in_progress">In Progress</option>
+                <option value="completed">Completed</option>
+                <option value="solved">Solved</option>
+                <option value="dismissed">Dismissed</option>
+              </optgroup>
+              {allCustomStatuses.length > 0 && (
+                <optgroup label="Custom Statuses">
+                  {allCustomStatuses.map(s => (
+                    <option key={s} value={s}>{s}</option>
+                  ))}
+                </optgroup>
+              )}
             </select>
             <select value={filterMonth} onChange={(e) => setFilterMonth(e.target.value)} className="rounded-xl border border-input bg-background px-4 py-2.5 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-ring min-w-[150px]">
               <option value="last_2_months">Last 2 Months</option>
@@ -715,16 +814,41 @@ const Complaints = () => {
                         <div className={`text-[10px] font-bold uppercase ${c.warranty_type === "warranty" ? "text-green-600" : "text-muted-foreground"}`}>{c.warranty_type.replace('_', '-')}</div>
                       </td>
                       <td className="px-4 py-3">
-                        <select value={c.status} onChange={(e) => updateStatus(c.id, e.target.value, c)}
-                          className={`px-3 py-1.5 rounded-lg text-xs font-bold capitalize border-0 cursor-pointer shadow-sm ${statusColors[c.status] || ""}`}
+                        <select 
+                          value={c.status} 
+                          onChange={(e) => {
+                            if (e.target.value === "__add_custom__") {
+                              setCustomStatusModal({ open: true, complaint: c, statusName: "" });
+                            } else {
+                              updateStatus(c.id, e.target.value, c);
+                            }
+                          }}
+                          className={`px-3 py-1.5 rounded-lg text-xs font-bold capitalize border-0 cursor-pointer shadow-sm ${getStatusBadgeClass(c.status)}`}
                           disabled={!isEditable(c)}>
-                          {["registered", "assigned", "in_progress", "solved", "invoice_generated", "dismissed"].map(s => (
-                            <option key={s} value={s}>{s.replace('_', ' ')}</option>
-                          ))}
+                          <optgroup label="Standard Status">
+                            {STANDARD_STATUSES.map(s => (
+                              <option key={s} value={s}>{s.replace(/_/g, ' ')}</option>
+                            ))}
+                          </optgroup>
+                          {allCustomStatuses.length > 0 && (
+                            <optgroup label="Custom Status">
+                              {allCustomStatuses.map(s => (
+                                <option key={s} value={s}>{s}</option>
+                              ))}
+                            </optgroup>
+                          )}
+                          <option value="__add_custom__">+ Add Custom Status...</option>
                         </select>
                       </td>
                       <td className="px-4 py-3 text-muted-foreground tabular-nums">{new Date(c.created_at).toLocaleDateString()}</td>
                       <td className="px-4 py-3 text-right flex justify-end gap-2">
+                        <button 
+                          onClick={() => generatePDF('complaint_receipt', c)} 
+                          className="p-2 rounded-lg hover:bg-primary/10 text-primary transition-colors" 
+                          title="Print / Download Slip"
+                        >
+                          <Printer className="w-4 h-4" />
+                        </button>
                         <button onClick={() => openViewComplaint(c)} className="p-2 rounded-lg hover:bg-info/10 text-info transition-colors" title="View Details">
                           <Search className="w-4 h-4" />
                         </button>
@@ -1262,9 +1386,32 @@ const Complaints = () => {
                     <h3 className="text-xl font-black font-display text-foreground tracking-tight">
                       Complaint #{viewComplaint.complaint_number}
                     </h3>
-                    <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider ${statusColors[viewComplaint.status] || "bg-muted text-muted-foreground"}`}>
-                      {viewComplaint.status?.replace(/_/g, ' ')}
-                    </span>
+                    <select
+                      value={viewComplaint.status}
+                      onChange={(e) => {
+                        if (e.target.value === "__add_custom__") {
+                          setCustomStatusModal({ open: true, complaint: viewComplaint, statusName: "" });
+                        } else {
+                          updateStatus(viewComplaint.id, e.target.value, viewComplaint);
+                        }
+                      }}
+                      className={`px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider cursor-pointer border-0 shadow-sm ${getStatusBadgeClass(viewComplaint.status)}`}
+                      disabled={!isEditable(viewComplaint)}
+                    >
+                      <optgroup label="Standard Status">
+                        {STANDARD_STATUSES.map(s => (
+                          <option key={s} value={s}>{s.replace(/_/g, ' ')}</option>
+                        ))}
+                      </optgroup>
+                      {allCustomStatuses.length > 0 && (
+                        <optgroup label="Custom Status">
+                          {allCustomStatuses.map(s => (
+                            <option key={s} value={s}>{s}</option>
+                          ))}
+                        </optgroup>
+                      )}
+                      <option value="__add_custom__">+ Add Custom Status...</option>
+                    </select>
                     <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider ${priorityColors[viewComplaint.priority] || "bg-muted text-muted-foreground"}`}>
                       {viewComplaint.priority} Priority
                     </span>

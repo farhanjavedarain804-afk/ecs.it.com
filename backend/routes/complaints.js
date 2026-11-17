@@ -4,9 +4,26 @@ const pool = require('../config/db');
 const auth = require('../middleware/auth');
 const emailService = require('../utils/emailService');
 
+// Helper to ensure complaints schema supports all features and custom statuses
+const ensureComplaintColumns = async () => {
+    try {
+        const [cols] = await pool.query("SHOW COLUMNS FROM complaints LIKE 'serial_number'");
+        if (cols.length === 0) {
+            await pool.query("ALTER TABLE complaints ADD COLUMN serial_number VARCHAR(100) DEFAULT NULL");
+        }
+        // Ensure status column is VARCHAR(100) so custom statuses are supported without enum restrictions
+        try {
+            await pool.query("ALTER TABLE complaints MODIFY COLUMN status VARCHAR(100) NOT NULL DEFAULT 'registered'");
+        } catch (e) {}
+    } catch (e) {
+        console.error('Error ensuring complaint columns:', e.message);
+    }
+};
+
 // @route   GET /api/complaints
 router.get('/', auth(), async (req, res) => {
     try {
+        await ensureComplaintColumns();
         const { branch_id, search, complaint_number, customer_id, month, year, all_records } = req.query;
         let { status } = req.query;
         let statusArray = [];
@@ -114,17 +131,7 @@ router.get('/', auth(), async (req, res) => {
     }
 });
 
-// Helper to ensure serial_number column exists in complaints table
-const ensureComplaintColumns = async () => {
-    try {
-        const [cols] = await pool.query("SHOW COLUMNS FROM complaints LIKE 'serial_number'");
-        if (cols.length === 0) {
-            await pool.query("ALTER TABLE complaints ADD COLUMN serial_number VARCHAR(100) DEFAULT NULL");
-        }
-    } catch (e) {
-        console.error('Error ensuring serial_number column:', e.message);
-    }
-};
+// ensureComplaintColumns defined at top of module
 
 // @route   POST /api/complaints
 router.post('/', auth(), async (req, res) => {
@@ -181,6 +188,7 @@ router.post('/', auth(), async (req, res) => {
 // @route   PATCH /api/complaints/:id
 router.patch('/:id', auth(), async (req, res) => {
     try {
+        await ensureComplaintColumns();
         const { id } = req.params;
         let updates = { ...req.body };
 

@@ -49,7 +49,7 @@ export const generatePDF = async (type: 'welcome_note' | 'complaint_receipt' | '
     }
 
     // 2. Add Branding (Skip for invoice as it has a custom header)
-    if (type !== 'invoice' && type !== 'salary_slip') {
+    if (type !== 'invoice' && type !== 'salary_slip' && type !== 'complaint_receipt') {
         addLogo(20, 10, 45, 18);
 
         doc.setFontSize(22);
@@ -102,25 +102,273 @@ export const generatePDF = async (type: 'welcome_note' | 'complaint_receipt' | '
         doc.text("Thank you for choosing ECS. We are committed to providing you with the best service.", 20, y);
     }
     else if (type === 'complaint_receipt') {
-        doc.text(`Complaint Number: ${data.complaint_number}`, 20, y);
-        y += 10;
-        doc.text(`Date & Time: ${new Date(data.created_at).toLocaleString()}`, 20, y);
-        y += 10;
-        doc.text(`Customer: ${data.customer_name}`, 20, y);
-        y += 10;
-        const city = data.customer_city || data.branches?.city || '';
-        doc.text(`City: ${city || '—'}`, 20, y);
-        y += 10;
-        doc.text(`Branch: ${data.branch_name}`, 20, y);
-        y += 10;
-        doc.text(`Type: ${data.complaint_type}`, 20, y);
-        y += 10;
-        doc.text(`Warranty: ${data.warranty_type === 'warranty' ? 'Yes' : 'No'}`, 20, y);
-        y += 10;
-        doc.text(`Resolution Time: ${data.resolution_time || '48 Hours'}`, 20, y);
-        y += 15;
-        doc.text(`Description:`, 20, y); y += 6;
-        doc.text(`${data.description}`, 20, y, { maxWidth: pageWidth - 40 });
+        // --- 1. HEADER SECTION ---
+        // Left Side: Company Official Logo
+        addLogo(15, 10, 42, 17);
+
+        // Center: Company Name & Subtitle
+        doc.setFontSize(15);
+        doc.setFont("helvetica", "bold");
+        doc.setTextColor(30, 58, 138); // Deep Navy Blue #1e3a8a
+        doc.text((settings.company_name || "ELECTRIC COMPLAINT SOLUTIONS").toUpperCase(), pageWidth / 2, 18, { align: "center" });
+
+        doc.setFontSize(7.5);
+        doc.setFont("helvetica", "normal");
+        doc.setTextColor(110);
+        doc.text("Your Satisfaction is Our Responsibility | Technical Service Acknowledgment", pageWidth / 2, 23, { align: "center" });
+
+        // Center: COMPLAINT RECEIPT banner
+        doc.setFillColor(30, 58, 138);
+        doc.roundedRect(pageWidth / 2 - 38, 26, 76, 7.5, 2, 2, 'F');
+        doc.setFontSize(10.5);
+        doc.setFont("helvetica", "bold");
+        doc.setTextColor(255, 255, 255);
+        doc.text("COMPLAINT RECEIPT", pageWidth / 2, 31.2, { align: "center" });
+
+        // Right Side: Dynamic QR Code with Verification Link
+        const vId = data.verification_id || data.complaint_number || "ECS-VERIFY-000";
+        const qrData = `${window.location.origin}/verify?id=${vId}`;
+        try {
+            const qrCodeUrl = await QRCode.toDataURL(qrData);
+            doc.addImage(qrCodeUrl, 'PNG', pageWidth - 42, 10, 27, 27);
+            doc.setFontSize(6.5);
+            doc.setFont("helvetica", "bold");
+            doc.setTextColor(120);
+            doc.text("Scan to Verify", pageWidth - 28.5, 39, { align: "center" });
+        } catch (err) {
+            console.error("QR Generation failed", err);
+        }
+
+        // Header Accent Divider Line
+        doc.setDrawColor(30, 58, 138);
+        doc.setLineWidth(0.7);
+        doc.line(15, 43, pageWidth - 15, 43);
+
+        // --- 2. COMPLAINT SUMMARY BAR ---
+        const bannerY = 47;
+        doc.setFillColor(245, 248, 252);
+        doc.roundedRect(15, bannerY, pageWidth - 30, 14, 2, 2, 'F');
+        doc.setDrawColor(215, 225, 240);
+        doc.setLineWidth(0.3);
+        doc.roundedRect(15, bannerY, pageWidth - 30, 14, 2, 2, 'S');
+
+        // Column 1: Complaint Number
+        doc.setFontSize(7.5);
+        doc.setFont("helvetica", "bold");
+        doc.setTextColor(100);
+        doc.text("COMPLAINT NUMBER", 20, bannerY + 5);
+        doc.setFontSize(10.5);
+        doc.setFont("helvetica", "bold");
+        doc.setTextColor(30, 58, 138);
+        doc.text(String(data.complaint_number || 'N/A'), 20, bannerY + 10.5);
+
+        // Column 2: Date & Time
+        const complaintDate = data.created_at ? new Date(data.created_at).toLocaleString('en-US', {
+            year: 'numeric', month: 'short', day: '2-digit', hour: '2-digit', minute: '2-digit'
+        }) : new Date().toLocaleString();
+        doc.setFontSize(7.5);
+        doc.setFont("helvetica", "bold");
+        doc.setTextColor(100);
+        doc.text("DATE & TIME", 80, bannerY + 5);
+        doc.setFontSize(8.5);
+        doc.setFont("helvetica", "normal");
+        doc.setTextColor(30);
+        doc.text(complaintDate, 80, bannerY + 10.5);
+
+        // Column 3: Status
+        const statusText = (data.status || 'Registered').replace(/_/g, ' ').toUpperCase();
+        doc.setFontSize(7.5);
+        doc.setFont("helvetica", "bold");
+        doc.setTextColor(100);
+        doc.text("STATUS", 135, bannerY + 5);
+        doc.setFontSize(8.5);
+        doc.setFont("helvetica", "bold");
+        if (data.status === 'solved' || data.status === 'completed') {
+            doc.setTextColor(16, 120, 72);
+        } else if (data.status === 'in_progress') {
+            doc.setTextColor(180, 83, 9);
+        } else {
+            doc.setTextColor(30, 58, 138);
+        }
+        doc.text(statusText, 135, bannerY + 10.5);
+
+        // Column 4: Verification ID
+        doc.setFontSize(7.5);
+        doc.setFont("helvetica", "bold");
+        doc.setTextColor(100);
+        doc.text("VERIFICATION ID", pageWidth - 20, bannerY + 5, { align: "right" });
+        doc.setFontSize(8);
+        doc.setFont("helvetica", "bold");
+        doc.setTextColor(30);
+        doc.text(String(vId), pageWidth - 20, bannerY + 10.5, { align: "right" });
+
+        // --- 3. TWO-COLUMN DETAILS CARDS ---
+        const cardsY = 66;
+        const colWidth = (pageWidth - 30 - 6) / 2; // 87 mm each
+        const leftColX = 15;
+        const rightColX = 15 + colWidth + 6;
+        const cardHeight = 63;
+
+        // --- Left Card: Customer Information ---
+        doc.setFillColor(255, 255, 255);
+        doc.roundedRect(leftColX, cardsY, colWidth, cardHeight, 2, 2, 'F');
+        doc.setDrawColor(220, 225, 235);
+        doc.setLineWidth(0.3);
+        doc.roundedRect(leftColX, cardsY, colWidth, cardHeight, 2, 2, 'S');
+
+        // Left Card Header
+        doc.setFillColor(30, 58, 138);
+        doc.roundedRect(leftColX, cardsY, colWidth, 7, 2, 2, 'F');
+        doc.setFontSize(8.5);
+        doc.setFont("helvetica", "bold");
+        doc.setTextColor(255, 255, 255);
+        doc.text("CUSTOMER INFORMATION", leftColX + 5, cardsY + 5);
+
+        let cY = cardsY + 13;
+        const renderField = (label: string, value: string, xPos: number, currentY: number, maxW: number = 55) => {
+            doc.setFontSize(7.5);
+            doc.setFont("helvetica", "bold");
+            doc.setTextColor(100);
+            doc.text(label, xPos + 5, currentY);
+            doc.setFont("helvetica", "normal");
+            doc.setTextColor(20);
+            const truncated = doc.splitTextToSize(String(value || 'N/A'), maxW)[0] || 'N/A';
+            doc.text(truncated, xPos + 31, currentY);
+        };
+
+        const custName = data.customer_name || data.customers?.name || 'Valued Customer';
+        const custPhone = data.customer_phone || data.customers?.phone || data.phone || 'N/A';
+        const custEmail = data.customer_email || data.customers?.email || data.email || 'N/A';
+        const custCity = data.customer_city || data.customers?.city || data.branches?.city || 'N/A';
+        const custAddress = data.customer_address || data.customers?.address || data.address || '';
+        const fullCustAddr = custAddress ? (custCity && !custAddress.toLowerCase().includes(custCity.toLowerCase()) ? `${custAddress}, ${custCity}` : custAddress) : (custCity || 'N/A');
+
+        renderField("Full Name:", custName, leftColX, cY); cY += 7.5;
+        renderField("Phone No:", custPhone, leftColX, cY); cY += 7.5;
+        renderField("Email Addr:", custEmail, leftColX, cY); cY += 7.5;
+        renderField("City:", custCity, leftColX, cY); cY += 7.5;
+        renderField("Address:", fullCustAddr, leftColX, cY, 52); cY += 7.5;
+        renderField("Cust ID:", data.customers?.customer_id || data.customer_id || 'N/A', leftColX, cY);
+
+        // --- Right Card: Service & Branch Details ---
+        doc.setFillColor(255, 255, 255);
+        doc.roundedRect(rightColX, cardsY, colWidth, cardHeight, 2, 2, 'F');
+        doc.setDrawColor(220, 225, 235);
+        doc.setLineWidth(0.3);
+        doc.roundedRect(rightColX, cardsY, colWidth, cardHeight, 2, 2, 'S');
+
+        // Right Card Header
+        doc.setFillColor(30, 58, 138);
+        doc.roundedRect(rightColX, cardsY, colWidth, 7, 2, 2, 'F');
+        doc.setFontSize(8.5);
+        doc.setFont("helvetica", "bold");
+        doc.setTextColor(255, 255, 255);
+        doc.text("SERVICE & ASSIGNMENT DETAILS", rightColX + 5, cardsY + 5);
+
+        let sY = cardsY + 13;
+        const branchDisplay = data.branch_name || data.branches?.name || 'Main Branch';
+        const branchCity = data.branch_city || data.branches?.city || '';
+        const fullBranch = branchCity ? `${branchDisplay} (${branchCity})` : branchDisplay;
+        const sType = (data.complaint_type || 'repair').toUpperCase();
+        const warrantyDisplay = data.warranty_type === 'warranty' ? 'Under Warranty' : 'Non-Warranty / Standard';
+        const techName = data.technician_name || data.staff?.full_name || 'Assigned to Branch Team';
+        const helperName = data.helper_name || data.helper?.full_name || 'N/A';
+        const priorityText = (data.priority || 'medium').toUpperCase();
+
+        renderField("Service Branch:", fullBranch, rightColX, sY, 52); sY += 7.5;
+        renderField("Service Type:", sType, rightColX, sY); sY += 7.5;
+        renderField("Warranty:", warrantyDisplay, rightColX, sY); sY += 7.5;
+        renderField("Serial Number:", String(data.serial_number || 'N/A'), rightColX, sY); sY += 7.5;
+        renderField("Priority Level:", priorityText, rightColX, sY); sY += 7.5;
+        renderField("Technician:", techName, rightColX, sY); sY += 7.5;
+        renderField("Helper / Asst:", helperName, rightColX, sY);
+
+        // --- 4. DESCRIPTION & COMPLAINT DETAILS BOX ---
+        const descY = cardsY + cardHeight + 6; // ~135 mm
+        const descBoxH = 40;
+        doc.setFillColor(255, 255, 255);
+        doc.roundedRect(15, descY, pageWidth - 30, descBoxH, 2, 2, 'F');
+        doc.setDrawColor(220, 225, 235);
+        doc.setLineWidth(0.3);
+        doc.roundedRect(15, descY, pageWidth - 30, descBoxH, 2, 2, 'S');
+
+        // Header for Description
+        doc.setFillColor(245, 248, 252);
+        doc.roundedRect(15, descY, pageWidth - 30, 7, 2, 2, 'F');
+        doc.setFontSize(8.5);
+        doc.setFont("helvetica", "bold");
+        doc.setTextColor(30, 58, 138);
+        doc.text("FAULT DESCRIPTION & CUSTOMER REMARKS", 20, descY + 5);
+
+        // Description text
+        doc.setFontSize(8.5);
+        doc.setFont("helvetica", "normal");
+        doc.setTextColor(40);
+        const descLines = doc.splitTextToSize(String(data.description || 'No specific fault description provided.'), pageWidth - 40);
+        doc.text(descLines.slice(0, 4), 20, descY + 13);
+
+        // Special Notes if present
+        if (data.notes) {
+            doc.setFontSize(7.5);
+            doc.setFont("helvetica", "bold");
+            doc.setTextColor(100);
+            doc.text("Notes / Remarks:", 20, descY + 32);
+            doc.setFont("helvetica", "italic");
+            doc.setTextColor(60);
+            const notesLines = doc.splitTextToSize(String(data.notes), pageWidth - 70);
+            doc.text(notesLines[0] || '', 47, descY + 32);
+        }
+
+        // --- 5. AUTHORIZATION & SIGNATURE SECTION ---
+        const signY = descY + descBoxH + 8; // ~183 mm
+        const signW = (pageWidth - 30 - 25) / 2;
+
+        // Customer Signature Box
+        doc.setDrawColor(200);
+        doc.setLineWidth(0.3);
+        doc.line(20, signY + 16, 20 + signW, signY + 16);
+        doc.setFontSize(7.5);
+        doc.setFont("helvetica", "bold");
+        doc.setTextColor(80);
+        doc.text("Customer Signature & Date", 20 + (signW / 2), signY + 20, { align: "center" });
+
+        // Authorized Officer / Stamp Box
+        doc.line(pageWidth - 20 - signW, signY + 16, pageWidth - 20, signY + 16);
+        doc.text("Authorized ECS Officer / Branch Stamp", (pageWidth - 20 - signW) + (signW / 2), signY + 20, { align: "center" });
+
+        // --- 6. FOOTER (EXACT SAME AS INVOICE) ---
+        let footerY = doc.internal.pageSize.getHeight() - 55;
+        doc.setFontSize(8.5);
+        doc.setFont("helvetica", "bold");
+        doc.setTextColor("#1e3a8a");
+        doc.text("Terms & Conditions:", 15, footerY);
+        footerY += 4.5;
+
+        doc.setFont("helvetica", "normal");
+        doc.setFontSize(7.5);
+        doc.setTextColor(80);
+        const termsText = "1. Technical inspection will be conducted as per ECS standard quality guidelines. 2. Real-time complaint progress can be tracked anytime by scanning the QR code above or visiting our official portal. 3. Please retain this official receipt for device collection and future warranty reference.";
+        doc.text(termsText, 15, footerY, { maxWidth: pageWidth - 30 });
+
+        // Divider Line
+        footerY = doc.internal.pageSize.getHeight() - 35;
+        doc.setLineWidth(0.1);
+        doc.setDrawColor(200);
+        doc.line(15, footerY, pageWidth - 15, footerY);
+        footerY += 5;
+
+        // Head Office Line
+        doc.setFontSize(8);
+        doc.setFont("helvetica", "normal");
+        doc.setTextColor(100);
+        doc.text(`Head Office: ${settings.company_address || '1st Floor, Zain Plaza, Islamabad'} | Tel: ${settings.company_phone || '+92 310 1111 327'} | Email: ${settings.company_email || 'ecs.isbpak@gmail.com'}`, pageWidth / 2, footerY, { align: "center" });
+
+        // Devionic Attribution Line
+        footerY += 6;
+        doc.setFontSize(8);
+        doc.setTextColor(100);
+        doc.setFont("helvetica", "bold");
+        doc.text("This Software is Developed by Devionic ( Private ) Limited | +92-317-7121841 | devionic.com", pageWidth / 2, footerY, { align: "center" });
     }
     else if (type === 'employee_letter') {
         // Header with Official Logo
