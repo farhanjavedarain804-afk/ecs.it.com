@@ -135,67 +135,20 @@ async function getBranchStats(branchId) {
     let totalExpenses = expenses + outgoing;
     let netProfit = totalRevenue - totalExpenses;
 
-    // Apply baseline calibration + dynamic tracking of all entries from 2026-11-17 onwards
+    // Apply exact adjustment offsets so baseline balances match requested amounts on 16th,
+    // and ALL actual Revenue & Expenses remain 100% real and intact,
+    // with all new entries (17th onwards) dynamically moving the balance in real-time.
     try {
         const [bRows] = await pool.query("SELECT name, city FROM branches WHERE id = ?", [branchId]);
         if (bRows.length > 0) {
             const bName = ((bRows[0].name || '') + ' ' + (bRows[0].city || '')).toLowerCase();
-            let targetBase = null;
-            if (bName.includes('bhakkar')) targetBase = -2770;
-            else if (bName.includes('b17') || bName.includes('b-17')) targetBase = 28640;
-            else if (bName.includes('islamabad') || bName.includes('isb')) targetBase = 3500;
-            else if (bName.includes('fateh') || bName.includes('jang')) targetBase = 0;
+            let adjustmentOffset = 0;
+            if (bName.includes('bhakkar')) adjustmentOffset = 80000;
+            else if (bName.includes('b17') || bName.includes('b-17')) adjustmentOffset = 31285;
+            else if (bName.includes('islamabad') || bName.includes('isb')) adjustmentOffset = 169311;
+            else if (bName.includes('fateh') || bName.includes('jang')) adjustmentOffset = -160;
 
-            if (targetBase !== null) {
-                // Dynamically fetch entries created or dated on/after Nov 17, 2026
-                const [newRevRes] = await pool.query(
-                    `SELECT SUM(total_amount) as total FROM invoices 
-                     WHERE branch_id = ? AND payment_status = 'paid' 
-                     AND (DATE(issued_at) >= '2026-11-17' OR DATE(created_at) >= '2026-11-17' OR DATE(updated_at) >= '2026-11-17')`,
-                    [branchId]
-                );
-                const [newCredRes] = await pool.query(
-                    `SELECT SUM(amount) as total FROM financial_entries 
-                     WHERE branch_id = ? AND entry_type IN ('Credit', 'income') 
-                     AND (DATE(entry_date) >= '2026-11-17' OR DATE(created_at) >= '2026-11-17')`,
-                    [branchId]
-                );
-                const [newExpRes] = await pool.query(
-                    `SELECT SUM(amount) as total FROM financial_entries 
-                     WHERE branch_id = ? AND entry_type IN ('Debit', 'expense') 
-                     AND (DATE(entry_date) >= '2026-11-17' OR DATE(created_at) >= '2026-11-17')`,
-                    [branchId]
-                );
-                const [newIncRes] = await pool.query(
-                    `SELECT SUM(amount) as total FROM branch_settlements 
-                     WHERE to_branch_id = ? AND transfer_type != 'Salary' 
-                     AND DATE(created_at) >= '2026-11-17'`,
-                    [branchId]
-                );
-                const [newOutRes] = await pool.query(
-                    `SELECT SUM(amount) as total FROM branch_settlements 
-                     WHERE from_branch_id = ? AND transfer_type != 'Salary' 
-                     AND DATE(created_at) >= '2026-11-17'`,
-                    [branchId]
-                );
-
-                const newInvoices = parseFloat(newRevRes[0]?.total) || 0;
-                const newCredits = parseFloat(newCredRes[0]?.total) || 0;
-                const newDebits = parseFloat(newExpRes[0]?.total) || 0;
-                const newIncoming = parseFloat(newIncRes[0]?.total) || 0;
-                const newOutgoing = parseFloat(newOutRes[0]?.total) || 0;
-
-                const newRevenueDelta = newInvoices + newCredits + newIncoming;
-                const newExpensesDelta = newDebits + newOutgoing;
-
-                // Dynamic balance: Base calibration + all new earnings - all new expenses
-                netProfit = targetBase + newRevenueDelta - newExpensesDelta;
-
-                const baseRev = targetBase >= 0 ? targetBase : 0;
-                const baseExp = targetBase < 0 ? Math.abs(targetBase) : 0;
-                totalRevenue = baseRev + newRevenueDelta;
-                totalExpenses = baseExp + newExpensesDelta;
-            }
+            netProfit = netProfit + adjustmentOffset;
         }
     } catch (e) {
         console.error('[getBranchStats Calibration Error]:', e.message);
